@@ -1,10 +1,18 @@
 import { applyMessage, normalizePhone, senderContext } from "./applyMessage";
 import { toSmallJpeg } from "./image";
+import type { MailboxMessage } from "./mailbox";
 import { istDate } from "./rules/time";
 import { getState, updateState } from "./store";
 import type { Understanding } from "./understandSchema";
 
-export type IncomingDraft = { phone: string; receivedAt: string; text: string; image?: string };
+export type IncomingDraft = {
+  phone: string;
+  receivedAt: string;
+  text: string;
+  image?: string;
+  source?: "whatsapp";
+  profileName?: string;
+};
 
 // Sends one WhatsApp message to the AI, then applies its answer with the rules.
 // Runs in the browser; the AI call itself happens on the server.
@@ -36,7 +44,42 @@ export async function processMessage(draft: IncomingDraft): Promise<{ ok: true; 
   const ms = data.elapsedMs ?? 0;
   updateState((s) => {
     const next = applyMessage(s, { id, phone, receivedAt: draft.receivedAt, text: draft.text, image }, data.understanding!);
-    return { ...next, messages: next.messages.map((m) => (m.id === id ? { ...m, aiMs: ms } : m)) };
+    return {
+      ...next,
+      messages: next.messages.map((m) => (m.id === id ? { ...m, aiMs: ms, source: draft.source, profileName: draft.profileName } : m)),
+    };
   });
   return { ok: true, ms };
+}
+
+let pausedUntil = 0;
+
+// Picks up real WhatsApp messages waiting in the mailbox and processes them in order.
+// Called every few seconds. If something fails (e.g. the AI key isn't set), it waits a
+// minute before trying again, and the message stays in the mailbox until it works.
+export async function pullWhatsApp(): Promise<{ connected: boolean; processed: number; error?: string }> {
+  if (Date.now() < pausedUntil) return { connected: true, processed: 0 };
+
+  let data: { connected?: boolean; messages?: MailboxMessage[]; error?: string };
+  try {
+    const res = await fetch(`/api/inbox?after=${getState().waCursor ?? 0}`);
+    data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+  } catch {
+    pausedUntil = Date.now() + 60_000;
+    return { connected: true, processed: 0, error: "Couldn't check for WhatsApp messages." };
+  }
+  if (!data.connected) return { connected: false, processed: 0 };
+
+  let processed = 0;
+  for (const m of data.messages ?? []) {
+    const result = await processMessage({ phone: m.from, receivedAt: m.receivedAt, text: m.text, image: m.image, source: "whatsapp", profileName: m.profileName });
+    if (!result.ok) {
+      pausedUntil = Date.now() + 60_000;
+      return { connected: true, processed, error: result.error };
+    }
+    updateState((s) => ({ ...s, waCursor: (s.waCursor ?? 0) + 1 }));
+    processed++;
+  }
+  return { connected: true, processed };
 }

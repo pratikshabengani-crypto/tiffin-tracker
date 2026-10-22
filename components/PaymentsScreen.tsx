@@ -20,7 +20,7 @@ const SECTIONS: { status: PayStatus; title: string; hint: string; dot: string }[
 ];
 
 export default function PaymentsScreen({ state, onBack }: Props) {
-  const now = nowOf(state);
+  const now = nowOf();
   const today = istDate(now);
   const rows = paymentRows(state, today);
   const [showPaid, setShowPaid] = useState(false);
@@ -33,7 +33,7 @@ export default function PaymentsScreen({ state, onBack }: Props) {
         ← Back
       </button>
       <div>
-        <h1 className="text-xl font-bold text-zinc-900">Payments</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Payments</h1>
         <p className="text-sm text-zinc-500">
           {formatINR(due)} to collect · single meals and plan advances
         </p>

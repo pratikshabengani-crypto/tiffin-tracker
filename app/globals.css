@@ -1,11 +1,52 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-jakarta);
   --font-mono: var(--font-geist-mono);
 }
 
+/* App look: a warm, homely palette instead of Tailwind's cold defaults.
+   Screens keep using emerald / zinc / amber class names; these redefine them. */
+@theme {
+  /* Curry-leaf green: buttons, active tab, "paid" */
+  --color-emerald-50: #eef8f1;
+  --color-emerald-100: #d5efdc;
+  --color-emerald-200: #addfbc;
+  --color-emerald-500: #2e9b5c;
+  --color-emerald-600: #1f8049;
+  --color-emerald-700: #166a3b;
+  --color-emerald-800: #115230;
+  --color-emerald-900: #0c3d24;
+
+  /* Warm neutrals for text, borders and backgrounds */
+  --color-zinc-50: #fbf8f4;
+  --color-zinc-100: #f5efe6;
+  --color-zinc-200: #e9e1d5;
+  --color-zinc-300: #d8cebf;
+  --color-zinc-400: #a99e8f;
+  --color-zinc-500: #7d7366;
+  --color-zinc-600: #5d554b;
+  --color-zinc-700: #463f37;
+  --color-zinc-800: #2f2a24;
+  --color-zinc-900: #1f1b17;
+
+  /* Turmeric for warnings and the demo panel */
+  --color-amber-50: #fff8eb;
+  --color-amber-100: #feedc7;
+  --color-amber-200: #fbdc95;
+
+  /* Rounder, softer cards */
+  --radius-xl: 1.1rem;
+  --radius-lg: 0.8rem;
+  --shadow-sm: 0 1px 2px rgb(60 40 20 / 0.05), 0 4px 14px -6px rgb(60 40 20 / 0.12);
+}
+
 body {
-  background: #f4f4f5;
-  color: #18181b;
+  background: #f5efe6;
+  color: #1f1b17;
+}
+
+/* Numbers line up in columns (counts, rupees) */
+.tabular-nums {
+  font-feature-settings: "tnum";
 }

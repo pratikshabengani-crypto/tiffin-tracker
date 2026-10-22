@@ -1,3 +1,10 @@
+// "21 Oct 2026, 9:12 pm" for the receipt's date line.
+export function receiptTime(instant: string): string {
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" })
+    .format(new Date(instant))
+    .toLowerCase();
+}
+
 // Draws a clearly-labelled SAMPLE payment receipt for the demo (never a real app's design).
 export function sampleScreenshot(amount: number, utr: string, when: string, paidTo = "Annapoorna Tiffins"): string {
   const rupees = new Intl.NumberFormat("en-IN").format(amount);

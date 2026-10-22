@@ -15,7 +15,7 @@ const PLAN_ORDER: PlanId[] = ["lunch", "dinner", "lunch_dinner", "breakfast_dinn
 const ENDING_SOON_DAYS = 3;
 
 export default function MonthlyTab({ state }: { state: AppState }) {
-  const today = istDate(nowOf(state));
+  const today = istDate(nowOf());
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [planFilter, setPlanFilter] = useState<PlanId | "all">("all");
@@ -70,7 +70,7 @@ export default function MonthlyTab({ state }: { state: AppState }) {
   return (
     <div className="space-y-3">
       <div>
-        <h1 className="text-xl font-bold text-zinc-900">Monthly subscribers</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Monthly subscribers</h1>
         <p className="text-sm text-zinc-500">{rows.length} active plans</p>
       </div>
 
@@ -133,7 +133,10 @@ export default function MonthlyTab({ state }: { state: AppState }) {
                     onClick={() => setSelected(r.summary.sub.id)}
                     className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-zinc-50"
                   >
-                    <span className="text-sm font-medium text-zinc-800">{r.customer.name}</span>
+                    <span className="flex items-center gap-2.5">
+                      <Initials name={r.customer.name} />
+                      <span className="text-sm font-medium text-zinc-800">{r.customer.name}</span>
+                    </span>
                     <RowStatus summary={r.summary} today={today} />
                   </button>
                 </li>
@@ -173,6 +176,21 @@ function RowStatus({ summary, today }: { summary: SubscriptionSummary; today: st
           {t.text}
         </span>
       ))}
+    </span>
+  );
+}
+
+// Look only: a round avatar with the person's initials.
+function Initials({ name }: { name: string }) {
+  const letters = name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800" aria-hidden="true">
+      {letters}
     </span>
   );
 }

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { findCustomer } from "../applyMessage";
 import { demoScript, scriptImage } from "./script";
-import { demoState } from "./seed";
+import { TEST_DAY, demoState } from "./seed";
 
 describe("demo script", () => {
-  const script = demoScript();
-  const state = demoState();
+  const script = demoScript(TEST_DAY);
+  const state = demoState(TEST_DAY);
 
   it("has 15 messages in time order", () => {
     expect(script).toHaveLength(15);
@@ -19,7 +19,7 @@ describe("demo script", () => {
   });
 
   it("draws sample screenshots for the payment messages", () => {
-    const images = script.map(scriptImage).filter(Boolean);
+    const images = script.map((m) => scriptImage(m)).filter(Boolean);
     expect(images).toHaveLength(3);
     expect(decodeURIComponent(images[0]!)).toContain("SAMPLE");
   });

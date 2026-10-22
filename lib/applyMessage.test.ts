@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveOutcome } from "./actions";
 import { applyMessage, senderContext, type IncomingMessage } from "./applyMessage";
-import { DEMO_TODAY, demoState } from "./demo/seed";
+import { TEST_DAY, demoState } from "./demo/seed";
 import { mealsOn, summarizeAll } from "./rules/counts";
 import { khataFor } from "./rules/khata";
 import { addDays, istInstant } from "./rules/time";
@@ -9,8 +9,8 @@ import type { AppState } from "./state";
 import { PLANS, type PlanId } from "./types";
 import type { AiRequest, Understanding } from "./understandSchema";
 
-const base = demoState();
-const today = DEMO_TODAY;
+const base = demoState(TEST_DAY);
+const today = TEST_DAY;
 const tomorrow = addDays(today, 1);
 const at = (hours: number, minutes = 0, date = today) => istInstant(date, hours, minutes).toISOString();
 

@@ -1,20 +1,39 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { resolveOutcome, setPrice } from "@/lib/actions";
+import { addCustomerFromMessage, resolveOutcome, setPrice } from "@/lib/actions";
 import { formatINR, MEAL_LABELS } from "@/lib/format";
 import { changesOn, mealsOn, summarizeAll, type DayChange } from "@/lib/rules/counts";
 import { canChangePrice, priceFor } from "@/lib/rules/orders";
 import { paymentRows } from "@/lib/rules/paymentStatus";
-import { addDays, formatDay, formatTime, istDate, istHour } from "@/lib/rules/time";
+import { addDays, cutoffStatus, formatDay, formatTime, istDate, istHour } from "@/lib/rules/time";
 import { needsAttention, nowOf, type AppState, type Message, type Outcome } from "@/lib/state";
 import { updateState } from "@/lib/store";
-import { MEALS, STANDARD_PRICES, type Meal } from "@/lib/types";
+import { MEALS, PLANS, STANDARD_PRICES, type Meal, type PlanId } from "@/lib/types";
 
 type Props = { state: AppState; onOpenPayments: () => void };
 
+// Look only: a colour and icon for each meal tile.
+const MEAL_STYLE: Record<Meal, { border: string; badge: string; icon: string }> = {
+  breakfast: {
+    border: "border-amber-400",
+    badge: "bg-amber-100 text-amber-700",
+    icon: "M4 18h16M7 18a5 5 0 0110 0M12 5v3M5.6 9.6l1.4 1.4M18.4 9.6L17 11", // sunrise
+  },
+  lunch: {
+    border: "border-emerald-500",
+    badge: "bg-emerald-100 text-emerald-700",
+    icon: "M12 4v2M12 18v2M4 12h2M18 12h2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4M12 8.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7z", // sun
+  },
+  dinner: {
+    border: "border-indigo-400",
+    badge: "bg-indigo-100 text-indigo-700",
+    icon: "M19 14.5A7.5 7.5 0 019.5 5a7.5 7.5 0 109.5 9.5z", // moon
+  },
+};
+
 export default function TodayTab({ state, onOpenPayments }: Props) {
-  const now = nowOf(state);
+  const now = nowOf();
   const today = istDate(now);
   const summaries = useMemo(() => summarizeAll(state), [state]);
   const counts = mealsOn(state, today, summaries);
@@ -28,21 +47,32 @@ export default function TodayTab({ state, onOpenPayments }: Props) {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-zinc-900">{greeting}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{greeting}</h1>
         <p className="text-sm text-zinc-500">
           {formatDay(today)} · {formatTime(now)}
-          {state.demoNow && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">demo clock</span>}
+          <span className="ml-2 inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-600" aria-hidden="true" />
+            live
+          </span>
         </p>
       </div>
 
       <section aria-label="Meals to cook today" className="grid grid-cols-3 gap-2">
         {MEALS.map((meal) => (
-          <div key={meal} className="rounded-xl bg-white p-3 shadow-sm">
-            <div className="text-xs text-zinc-500">{MEAL_LABELS[meal]}</div>
-            <div className="text-3xl font-bold tabular-nums text-zinc-900">{counts[meal].total}</div>
+          <div key={meal} className={`rounded-xl border-t-4 bg-white p-3 shadow-sm ${MEAL_STYLE[meal].border}`}>
+            <div className="flex items-center justify-between text-xs font-medium text-zinc-600">
+              {MEAL_LABELS[meal]}
+              <span className={`flex h-6 w-6 items-center justify-center rounded-full ${MEAL_STYLE[meal].badge}`} aria-hidden="true">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d={MEAL_STYLE[meal].icon} />
+                </svg>
+              </span>
+            </div>
+            <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums text-zinc-900">{counts[meal].total}</div>
             <div className="text-[11px] leading-tight text-zinc-500">
               {counts[meal].subscribers} plan{counts[meal].single > 0 && ` + ${counts[meal].single} single`}
             </div>
+            <CutoffLine meal={meal} today={today} now={now} />
           </div>
         ))}
       </section>
@@ -62,6 +92,21 @@ export default function TodayTab({ state, onOpenPayments }: Props) {
       <ChangesCard changes={changes} />
 
       <PricesCard state={state} date={addDays(today, 1)} now={now} />
+    </div>
+  );
+}
+
+// "Changes till 10:00 am" while skips and cancellations are allowed, then "Locked".
+function CutoffLine({ meal, today, now }: { meal: Meal; today: string; now: string }) {
+  const status = cutoffStatus(meal, today, now);
+  if (status.open) {
+    return <div className="mt-2 rounded-md bg-emerald-50 px-1.5 py-1 text-[10px] font-semibold leading-tight text-emerald-800">Changes till {formatTime(status.until)}</div>;
+  }
+  const nextDay = istDate(status.nextUntil) === today ? "tonight" : "tomorrow";
+  return (
+    <div className="mt-2 rounded-md bg-zinc-100 px-1.5 py-1 text-[10px] leading-tight text-zinc-600">
+      <span className="font-semibold text-zinc-800">🔒 Locked</span>
+      <span className="block">next: till {formatTime(status.nextUntil)} {nextDay}</span>
     </div>
   );
 }
@@ -104,11 +149,59 @@ function AttentionItem({ message, outcome }: { message: Message; outcome: Outcom
             <Button primary onClick={() => resolve("approved")}>Accept</Button>
             <Button onClick={() => resolve("dismissed")}>Decline</Button>
           </>
+        ) : !message.senderName ? (
+          <AddCustomer message={message} outcome={outcome} onHandled={() => resolve("dismissed")} />
         ) : (
           <Button onClick={() => resolve("dismissed")}>Mark as handled</Button>
         )}
       </div>
     </li>
+  );
+}
+
+// Turn an unknown WhatsApp number into a customer (optionally on a monthly plan from today).
+function AddCustomer({ message, outcome, onHandled }: { message: Message; outcome: Outcome; onHandled: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(message.profileName ?? "");
+  const [plan, setPlan] = useState<PlanId | "">("");
+
+  if (!open) {
+    return (
+      <>
+        <Button primary onClick={() => setOpen(true)}>Add as customer</Button>
+        <Button onClick={onHandled}>Mark as handled</Button>
+      </>
+    );
+  }
+
+  const save = () => {
+    if (!name.trim()) return;
+    updateState((s) => addCustomerFromMessage(s, message.id, outcome.id, name, plan || null, istDate(nowOf())));
+  };
+  const input = "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm";
+  return (
+    <div className="w-full space-y-2 rounded-lg bg-white p-3 ring-1 ring-amber-200">
+      <label className="block text-xs text-zinc-600">
+        Name
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer's name" className={input} />
+      </label>
+      <label className="block text-xs text-zinc-600">
+        Monthly plan
+        <select value={plan} onChange={(e) => setPlan(e.target.value as PlanId | "")} className={input}>
+          <option value="">No plan (single meals)</option>
+          {(Object.keys(PLANS) as PlanId[]).map((id) => (
+            <option key={id} value={id}>
+              {PLANS[id].label} · {formatINR(PLANS[id].price)} · from today
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="text-[11px] text-zinc-500">Phone +91 {message.phone}. Their next messages will be recognised.</p>
+      <div className="flex gap-2">
+        <Button primary onClick={save}>Save customer</Button>
+        <Button onClick={() => setOpen(false)}>Cancel</Button>
+      </div>
+    </div>
   );
 }
 
@@ -133,15 +226,15 @@ function MoneyCard({ rows, onOpen }: { rows: ReturnType<typeof paymentRows>; onO
   const overdue = rows.filter((r) => r.status === "unpaid" && r.daysUnpaid > 3).length;
 
   return (
-    <button type="button" onClick={onOpen} className="block w-full rounded-xl bg-white p-4 text-left shadow-sm hover:ring-1 hover:ring-zinc-300">
+    <button type="button" onClick={onOpen} className="block w-full rounded-xl bg-emerald-800 p-4 text-left text-white shadow-sm hover:bg-emerald-900">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold text-zinc-800">Money to collect</h2>
-        <span className="text-xs font-medium text-emerald-700">Open payments →</span>
+        <h2 className="text-sm font-semibold text-emerald-50">Money to collect</h2>
+        <span className="text-xs font-semibold text-amber-200">Open payments →</span>
       </div>
-      <div className="mt-1 text-2xl font-bold tabular-nums text-zinc-900">{formatINR(due)}</div>
-      <div className="text-xs text-zinc-500">
+      <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums">{formatINR(due)}</div>
+      <div className="text-xs text-emerald-100">
         from {owing} {owing === 1 ? "person" : "people"}
-        {overdue > 0 && <span className="text-red-700"> · {overdue} overdue</span>}
+        {overdue > 0 && <span className="font-semibold text-red-200"> · {overdue} overdue</span>}
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
         <Pill className="bg-sky-100 text-sky-800">{count("screenshot")} screenshots to check</Pill>

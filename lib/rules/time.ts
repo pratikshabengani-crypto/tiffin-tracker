@@ -54,6 +54,17 @@ export function isOnTime(meal: Meal, date: string, requestedAt: string | Date): 
   return new Date(requestedAt).getTime() <= cutoffFor(meal, date).getTime();
 }
 
+// Can today's meal still be skipped, ordered or cancelled? And until when can the
+// next day's be changed?
+export function cutoffStatus(meal: Meal, today: string, now: Date | string): { open: boolean; until: Date; nextUntil: Date } {
+  const until = cutoffFor(meal, today);
+  return {
+    open: new Date(now).getTime() <= until.getTime(),
+    until,
+    nextUntil: cutoffFor(meal, addDays(today, 1)),
+  };
+}
+
 // After this the meal has been delivered: it's owed and its price is locked.
 const SERVED_BY: Record<Meal, number> = { breakfast: 10, lunch: 15, dinner: 22 };
 

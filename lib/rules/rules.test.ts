@@ -8,6 +8,7 @@ import { mealTrack, nextAway, servesOn, summarizeSubscription } from "./subscrip
 import {
   addDays,
   cutoffFor,
+  cutoffStatus,
   daysBetween,
   formatDay,
   formatTime,
@@ -102,6 +103,17 @@ describe("time", () => {
   it("dinner cutoff is 5 pm the same day", () => {
     expect(isOnTime("dinner", "2026-10-22", at("2026-10-22", 16, 59))).toBe(true);
     expect(isOnTime("dinner", "2026-10-22", at("2026-10-22", 17, 1))).toBe(false);
+  });
+
+  it("says whether today's meal can still be changed", () => {
+    const morning = at("2026-10-22", 9, 30);
+    expect(cutoffStatus("lunch", "2026-10-22", morning).open).toBe(true);
+    expect(cutoffStatus("lunch", "2026-10-22", at("2026-10-22", 10, 5)).open).toBe(false);
+    expect(cutoffStatus("dinner", "2026-10-22", morning).open).toBe(true);
+    // Today's breakfast closed last night; tomorrow's closes at 10 pm today.
+    const breakfast = cutoffStatus("breakfast", "2026-10-22", morning);
+    expect(breakfast.open).toBe(false);
+    expect(breakfast.nextUntil.toISOString()).toBe(istInstant("2026-10-22", 22).toISOString());
   });
 
   it("formats days and times for India", () => {

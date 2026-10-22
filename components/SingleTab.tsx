@@ -14,7 +14,7 @@ import { MEALS, STANDARD_PRICES, type Meal, type SingleOrder } from "@/lib/types
 type Props = { state: AppState; onOpenPayments: () => void };
 
 export default function SingleTab({ state, onOpenPayments }: Props) {
-  const now = nowOf(state);
+  const now = nowOf();
   const today = istDate(now);
   const [date, setDate] = useState(today);
   const [adding, setAdding] = useState(false);
@@ -34,7 +34,7 @@ export default function SingleTab({ state, onOpenPayments }: Props) {
   return (
     <div className="space-y-3">
       <div>
-        <h1 className="text-xl font-bold text-zinc-900">Single meals</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Single meals</h1>
         <p className="text-sm text-zinc-500">Orders from people without a monthly plan, and extra meals.</p>
       </div>
 

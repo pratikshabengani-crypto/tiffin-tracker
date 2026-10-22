@@ -1,13 +1,13 @@
 import { demoState } from "./demo/seed";
+import { istDate } from "./rules/time";
 import type { AppState } from "./state";
 
 // The whole app state lives in this browser's localStorage. React reads it through
-// useSyncExternalStore(subscribe, getState, getServerState).
+// useSyncExternalStore(subscribe, getState, getState).
 const STORAGE_KEY = "tiffin-tracker:state:v2";
 
 let cachedRaw: string | null = null;
 let cached: AppState | null = null;
-let serverState: AppState | null = null;
 const listeners = new Set<() => void>();
 
 function readRaw(): string | null {
@@ -21,7 +21,7 @@ function readRaw(): string | null {
 function parse(raw: string): AppState | null {
   try {
     const value = JSON.parse(raw);
-    return value && value.version === 2 && Array.isArray(value.customers) ? (value as AppState) : null;
+    return value && value.version === 3 && Array.isArray(value.customers) ? (value as AppState) : null;
   } catch {
     return null;
   }
@@ -33,14 +33,20 @@ export function getState(): AppState {
     cachedRaw = raw;
     cached = parse(raw);
   }
-  if (!cached) cached = demoState();
-  return cached;
+  // The sample data is built around one day; on a new day, rebuild it so "today" stays current.
+  if (!cached || cached.seededFor !== istDate(new Date())) save(demoState());
+  return cached!;
 }
 
-// The first render (on the server and while the page loads) uses the demo data.
-export function getServerState(): AppState {
-  if (!serverState) serverState = demoState();
-  return serverState;
+// Store without telling React (safe while React is reading the state).
+function save(next: AppState): void {
+  cached = next;
+  cachedRaw = JSON.stringify(next);
+  try {
+    window.localStorage.setItem(STORAGE_KEY, cachedRaw);
+  } catch {
+    // Still works for this visit; it just won't survive a reload.
+  }
 }
 
 export function subscribe(listener: () => void): () => void {
@@ -53,13 +59,7 @@ export function subscribe(listener: () => void): () => void {
 }
 
 export function setState(next: AppState): void {
-  cached = next;
-  cachedRaw = JSON.stringify(next);
-  try {
-    window.localStorage.setItem(STORAGE_KEY, cachedRaw);
-  } catch {
-    // Still works for this visit; it just won't survive a reload.
-  }
+  save(next);
   listeners.forEach((listener) => listener());
 }
 

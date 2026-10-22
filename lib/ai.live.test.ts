@@ -4,25 +4,25 @@
 import { describe, expect, it } from "vitest";
 import { applyMessage, findCustomer, senderContext } from "./applyMessage";
 import { demoScript } from "./demo/script";
-import { DEMO_TODAY, demoState } from "./demo/seed";
+import { TEST_DAY, demoState } from "./demo/seed";
 import { istInstant } from "./rules/time";
 import type { Understanding } from "./understandSchema";
 
 const BASE_URL = process.env.APP_URL ?? "http://localhost:3000";
-const state = demoState();
+const state = demoState(TEST_DAY);
 const singleCustomer = state.customers.find((c) => !state.subscriptions.some((s) => s.customerId === c.id))!;
 
 const tricky = [
-  { phone: singleCustomer.phone, text: "paid", at: istInstant(DEMO_TODAY, 12).toISOString(), shows: "payment, no amount" },
-  { phone: singleCustomer.phone, text: "Transferred 500 or 600 I forgot", at: istInstant(DEMO_TODAY, 12).toISOString(), shows: "unclear amount" },
-  { phone: singleCustomer.phone, text: "send tomorrow's same as usual", at: istInstant(DEMO_TODAY, 12).toISOString(), shows: "vague order" },
+  { phone: singleCustomer.phone, text: "paid", at: istInstant(TEST_DAY, 12).toISOString(), shows: "payment, no amount" },
+  { phone: singleCustomer.phone, text: "Transferred 500 or 600 I forgot", at: istInstant(TEST_DAY, 12).toISOString(), shows: "unclear amount" },
+  { phone: singleCustomer.phone, text: "send tomorrow's same as usual", at: istInstant(TEST_DAY, 12).toISOString(), shows: "vague order" },
 ];
 
-const messages = [...demoScript().filter((m) => !m.screenshot), ...tricky];
+const messages = [...demoScript(TEST_DAY).filter((m) => !m.screenshot), ...tricky];
 
 describe.skipIf(!process.env.LIVE_AI)("live AI", () => {
   it.each(messages.map((m, i) => [i, m] as const))("message %i", async (_, m) => {
-    const sender = senderContext(state, m.phone, DEMO_TODAY);
+    const sender = senderContext(state, m.phone, TEST_DAY);
     const started = Date.now();
     const res = await fetch(`${BASE_URL}/api/understand`, {
       method: "POST",

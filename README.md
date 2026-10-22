@@ -31,6 +31,24 @@ OPENROUTER_API_KEY=your-key-here
 
 Then open http://localhost:3000 and use **Inbox → Play next message**.
 
+## WhatsApp connection (optional)
+
+Real WhatsApp messages come in through Meta's WhatsApp Cloud API:
+
+1. Meta sends each message to `/api/whatsapp` (the webhook). It checks Meta's signature, downloads any photo, and puts the message in a small mailbox (Upstash Redis).
+2. The dashboard checks `/api/inbox` every few seconds and runs new messages through the same AI and rules as the simulated ones.
+
+Settings (Vercel → Settings → Environment Variables):
+
+| Name | Where it comes from |
+|---|---|
+| `WHATSAPP_VERIFY_TOKEN` | A password you make up; type the same one into Meta's webhook form |
+| `WHATSAPP_APP_SECRET` | Meta app → App settings → Basic → App secret |
+| `WHATSAPP_ACCESS_TOKEN` | Meta app → WhatsApp → API Setup → access token (needed for photos) |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Added automatically when you connect Upstash Redis from Vercel → Storage |
+
+Webhook URL for Meta: `https://<your-site>/api/whatsapp`, subscribed to the `messages` field.
+
 ## Tests
 
 ```bash

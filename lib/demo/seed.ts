@@ -1,11 +1,11 @@
 import type { AppState, Message } from "../state";
-import { addDays, istInstant } from "../rules/time";
-import { sampleScreenshot } from "./screenshot";
+import { addDays, istDate, istInstant } from "../rules/time";
+import { receiptTime, sampleScreenshot } from "./screenshot";
 import { PLANS, type Customer, type Meal, type MealChange, type Payment, type PlanId, type SingleOrder, type Subscription } from "../types";
 
-// The demo always opens at Thursday 22 Oct 2026, 7:30 am India time.
-export const DEMO_TODAY = "2026-10-22";
-export const DEMO_START = istInstant(DEMO_TODAY, 7, 30).toISOString();
+// Sample data is built around the real "today", so the live dashboard always looks current.
+// Tests pass a fixed day (TEST_DAY) so their results never change.
+export const TEST_DAY = "2026-10-22";
 
 const at = (date: string, hours: number, minutes = 0) => istInstant(date, hours, minutes).toISOString();
 
@@ -37,7 +37,7 @@ const PLAN_MIX: [PlanId, number][] = [
   ["all_three", 18],
 ];
 
-export function demoState(): AppState {
+export function demoState(today: string = istDate(new Date())): AppState {
   const rand = random(2026);
   const pick = <T,>(items: T[]) => items[Math.floor(rand() * items.length)];
   const used = new Set<string>();
@@ -71,9 +71,9 @@ export function demoState(): AppState {
   for (const [planId, count] of PLAN_MIX) {
     for (let i = 0; i < count; i++) {
       const customer = newCustomer();
-      // Started between 24 Sep and 21 Oct, so everyone is active today
+      // Started between 28 and 1 days ago, so everyone is active today
       // and a few renew in the next couple of days.
-      const startDate = addDays("2026-09-24", Math.floor(rand() * 28));
+      const startDate = addDays(addDays(today, -28), Math.floor(rand() * 28));
       const sub: Subscription = { id: nextId("s"), customerId: customer.id, planId, startDate };
       customers.push(customer);
       subscriptions.push(sub);
@@ -84,13 +84,13 @@ export function demoState(): AppState {
       const skips = Math.floor(rand() * 4);
       for (let k = 0; k < skips; k++) {
         const date = addDays(startDate, 1 + Math.floor(rand() * 20));
-        if (date >= DEMO_TODAY) continue;
+        if (date >= today) continue;
         const meal = pick(meals);
         skipFor(customer.id, date, meal, at(addDays(date, -1), 19, Math.floor(rand() * 59)));
       }
 
       // Advance paid at the start, except a few recent ones.
-      const recent = startDate >= "2026-10-18";
+      const recent = startDate >= addDays(today, -4);
       if (!(recent && rand() < 0.5)) {
         payments.push({
           id: nextId("p"),
@@ -112,15 +112,15 @@ export function demoState(): AppState {
   const withMeal = (meal: Meal) =>
     subscribers.filter((s) => PLANS[s.sub.planId].meals.includes(meal));
   // 6 lunch skips and 3 dinner skips today, sent in time.
-  for (const s of withMeal("lunch").slice(3, 9)) skipFor(s.customer.id, DEMO_TODAY, "lunch", at("2026-10-21", 20, 10));
-  for (const s of withMeal("dinner").slice(5, 8)) skipFor(s.customer.id, DEMO_TODAY, "dinner", at(DEMO_TODAY, 6, 45));
+  for (const s of withMeal("lunch").slice(3, 9)) skipFor(s.customer.id, today, "lunch", at(addDays(today, -1), 20, 10));
+  for (const s of withMeal("dinner").slice(5, 8)) skipFor(s.customer.id, today, "dinner", at(today, 6, 45));
   // 2 breakfast skips sent last night in time.
-  for (const s of withMeal("breakfast").slice(0, 2)) skipFor(s.customer.id, DEMO_TODAY, "breakfast", at("2026-10-21", 21, 30));
+  for (const s of withMeal("breakfast").slice(0, 2)) skipFor(s.customer.id, today, "breakfast", at(addDays(today, -1), 21, 30));
 
   // A breakfast skip that came in this morning: too late, needs the owner.
   const lateSkipper = withMeal("breakfast")[4];
   const lateMsgId = nextId("msg");
-  const late = skipFor(lateSkipper.customer.id, DEMO_TODAY, "breakfast", at(DEMO_TODAY, 6, 55), lateMsgId);
+  const late = skipFor(lateSkipper.customer.id, today, "breakfast", at(today, 6, 55), lateMsgId);
   messages.push({
     id: lateMsgId,
     phone: lateSkipper.customer.phone,
@@ -141,8 +141,8 @@ export function demoState(): AppState {
 
   // Two subscribers away 25 to 28 Oct (pause).
   for (const s of withMeal("lunch").slice(12, 14)) {
-    for (const date of ["2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28"]) {
-      for (const meal of PLANS[s.sub.planId].meals) skipFor(s.customer.id, date, meal, at("2026-10-20", 18));
+    for (const date of [3, 4, 5, 6].map((d) => addDays(today, d))) {
+      for (const meal of PLANS[s.sub.planId].meals) skipFor(s.customer.id, date, meal, at(addDays(today, -2), 18));
     }
   }
 
@@ -150,7 +150,7 @@ export function demoState(): AppState {
   messages.push({
     id: nextId("msg"),
     phone: "9845012345",
-    receivedAt: at(DEMO_TODAY, 7, 5),
+    receivedAt: at(today, 7, 5),
     text: "Hi, do you deliver tiffin to HSR Layout? Need lunch from Monday",
     summary: "New enquiry from an unknown number",
     outcomes: [
@@ -164,7 +164,7 @@ export function demoState(): AppState {
   });
 
   // A subscription advance claimed with a screenshot, waiting for the owner.
-  const renewing = subscribers.find((s) => s.sub.startDate >= "2026-10-18" && !payments.some((p) => p.subscriptionId === s.sub.id));
+  const renewing = subscribers.find((s) => s.sub.startDate >= addDays(today, -4) && !payments.some((p) => p.subscriptionId === s.sub.id));
   if (renewing) {
     payments.push({
       id: nextId("p"),
@@ -174,11 +174,11 @@ export function demoState(): AppState {
       amount: PLANS[renewing.sub.planId].price,
       method: "upi",
       evidence: "screenshot",
-      screenshot: sampleScreenshot(PLANS[renewing.sub.planId].price, "6021 4471 9935", "21 Oct 2026, 9:12 pm"),
+      screenshot: sampleScreenshot(PLANS[renewing.sub.planId].price, "6021 4471 9935", receiptTime(at(addDays(today, -1), 21, 12))),
       utr: "6021 4471 9935",
       paidTo: "Annapoorna Tiffins",
       status: "pending",
-      claimedAt: at("2026-10-21", 21, 12),
+      claimedAt: at(addDays(today, -1), 21, 12),
     });
   }
 
@@ -200,10 +200,10 @@ export function demoState(): AppState {
     // A few meals over the past week.
     const meals = 1 + (i % 4);
     for (let k = 0; k < meals; k++) {
-      order(customer, addDays(DEMO_TODAY, -1 - ((i + k * 2) % 7)), k % 2 === 0 ? "lunch" : "dinner", k === 0 && i % 3 === 0 ? 2 : 1);
+      order(customer, addDays(today, -1 - ((i + k * 2) % 7)), k % 2 === 0 ? "lunch" : "dinner", k === 0 && i % 3 === 0 ? 2 : 1);
     }
     // Some also eat today.
-    if (i % 3 !== 2) order(customer, DEMO_TODAY, i % 2 === 0 ? "lunch" : "dinner");
+    if (i % 3 !== 2) order(customer, today, i % 2 === 0 ? "lunch" : "dinner");
   });
 
   // How they've paid so far.
@@ -216,26 +216,26 @@ export function demoState(): AppState {
       method: "upi",
       evidence: "text",
       status: "received",
-      claimedAt: at("2026-10-20", 20),
-      decidedAt: at("2026-10-20", 21),
+      claimedAt: at(addDays(today, -2), 20),
+      decidedAt: at(addDays(today, -2), 21),
       ...extra,
     });
   claim(singles[0], 390, {}); // fully paid, including today
   claim(singles[1], 260, {});
   claim(singles[4], 390, {});
-  claim(singles[2], 260, { status: "pending", evidence: "screenshot", screenshot: sampleScreenshot(260, "6021 5530 1178", "21 Oct 2026, 10:04 pm"), utr: "6021 5530 1178", paidTo: "Annapoorna Tiffins", claimedAt: at("2026-10-21", 22, 4), decidedAt: undefined });
-  claim(singles[6], 130, { status: "pending", evidence: "screenshot", screenshot: sampleScreenshot(130, "6021 7712 0466", "22 Oct 2026, 7:02 am"), utr: "6021 7712 0466", paidTo: "Annapoorna Tiffins", claimedAt: at(DEMO_TODAY, 7, 2), decidedAt: undefined });
-  claim(singles[3], 260, { status: "pending", evidence: "text", claimedAt: at("2026-10-21", 19, 30), decidedAt: undefined });
-  claim(singles[9], 130, { status: "pending", evidence: "text", claimedAt: at(DEMO_TODAY, 6, 40), decidedAt: undefined });
+  claim(singles[2], 260, { status: "pending", evidence: "screenshot", screenshot: sampleScreenshot(260, "6021 5530 1178", receiptTime(at(addDays(today, -1), 22, 4))), utr: "6021 5530 1178", paidTo: "Annapoorna Tiffins", claimedAt: at(addDays(today, -1), 22, 4), decidedAt: undefined });
+  claim(singles[6], 130, { status: "pending", evidence: "screenshot", screenshot: sampleScreenshot(130, "6021 7712 0466", receiptTime(at(today, 7, 2))), utr: "6021 7712 0466", paidTo: "Annapoorna Tiffins", claimedAt: at(today, 7, 2), decidedAt: undefined });
+  claim(singles[3], 260, { status: "pending", evidence: "text", claimedAt: at(addDays(today, -1), 19, 30), decidedAt: undefined });
+  claim(singles[9], 130, { status: "pending", evidence: "text", claimedAt: at(today, 6, 40), decidedAt: undefined });
 
   return {
-    version: 2,
-    demoNow: DEMO_START,
+    version: 3,
+    seededFor: today,
     customers,
     subscriptions,
     mealChanges,
     singleOrders,
-    priceOverrides: [{ date: "2026-10-19", meal: "dinner", price: 150 }],
+    priceOverrides: [{ date: addDays(today, -3), meal: "dinner", price: 150 }],
     payments,
     messages,
     demoCursor: 0,

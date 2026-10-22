@@ -27,18 +27,22 @@ export type Message = {
   image?: string;
   summary?: string; // what the AI understood
   aiMs?: number; // how long the AI took to read it
+  source?: "whatsapp"; // came in through the real WhatsApp connection
+  profileName?: string; // sender's WhatsApp display name
   outcomes: Outcome[];
 };
 
 export type AppState = Facts & {
-  version: 2;
-  demoNow: string | null; // demo clock; null = real time
+  version: 3;
+  seededFor: string; // the day the sample data was built around (YYYY-MM-DD)
   messages: Message[];
-  demoCursor: number; // next scripted demo message
+  demoCursor: number; // next simulated WhatsApp message
+  waCursor?: number; // how many real WhatsApp messages have been picked up
 };
 
-export function nowOf(state: AppState): string {
-  return state.demoNow ?? new Date().toISOString();
+// Everything runs on the real current time.
+export function nowOf(): string {
+  return new Date().toISOString();
 }
 
 export function needsAttention(state: AppState): { message: Message; outcome: Outcome }[] {

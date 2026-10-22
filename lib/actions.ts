@@ -1,16 +1,8 @@
 import type { AppState } from "./state";
-import { STANDARD_PRICES, type Customer, type Meal, type Payment, type PaymentMethod } from "./types";
+import { STANDARD_PRICES, type Customer, type Meal, type Payment, type PaymentMethod, type PlanId } from "./types";
 
 function newId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-// ---- demo clock -------------------------------------------------------------------
-
-// Move the demo clock forward (never backwards, so cutoffs stay believable).
-export function setDemoNow(state: AppState, instant: string): AppState {
-  if (state.demoNow && instant <= state.demoNow) return state;
-  return { ...state, demoNow: instant };
 }
 
 // ---- customers and single orders ----------------------------------------------
@@ -18,6 +10,26 @@ export function setDemoNow(state: AppState, instant: string): AppState {
 export function addCustomer(state: AppState, name: string, phone: string): { state: AppState; customer: Customer } {
   const customer: Customer = { id: newId("c"), name: name.trim(), phone: phone.replace(/\D/g, "").slice(-10) };
   return { state: { ...state, customers: [...state.customers, customer] }, customer };
+}
+
+// "Add as customer" for a message from an unknown number, optionally with a monthly plan.
+export function addCustomerFromMessage(
+  state: AppState,
+  messageId: string,
+  outcomeId: string,
+  name: string,
+  planId: PlanId | null,
+  startDate: string,
+): AppState {
+  const message = state.messages.find((m) => m.id === messageId);
+  if (!message || !name.trim()) return state;
+  const added = addCustomer(state, name, message.phone);
+  let next = added.state;
+  if (planId) {
+    next = { ...next, subscriptions: [...next.subscriptions, { id: newId("s"), customerId: added.customer.id, planId, startDate }] };
+  }
+  next = resolveOutcome(next, messageId, outcomeId, "dismissed");
+  return { ...next, messages: next.messages.map((m) => (m.id === messageId ? { ...m, senderName: added.customer.name } : m)) };
 }
 
 export function addOrder(
