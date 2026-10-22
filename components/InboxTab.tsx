@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { findCustomer } from "@/lib/applyMessage";
+import { contactLabel } from "@/lib/contact";
 import { demoScript, scriptImage } from "@/lib/demo/script";
 import { readFile } from "@/lib/image";
 import { processMessage } from "@/lib/process";
@@ -11,9 +12,10 @@ import { resetDemo, updateState } from "@/lib/store";
 
 
 
-export type WhatsAppStatus = { connected: boolean; error?: string };
+export type ChannelStatus = { connected: boolean; error?: string };
+export type Channels = { whatsapp: ChannelStatus; telegram: ChannelStatus };
 
-export default function InboxTab({ state, whatsapp }: { state: AppState; whatsapp: WhatsAppStatus }) {
+export default function InboxTab({ state, channels }: { state: AppState; channels: Channels }) {
   const now = nowOf();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,20 +37,14 @@ export default function InboxTab({ state, whatsapp }: { state: AppState; whatsap
     <div className="space-y-3">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Inbox</h1>
-        <p className="text-sm text-zinc-500">WhatsApp messages, and what the app did with each one.</p>
+        <p className="text-sm text-zinc-500">Customer messages, and what the app did with each one.</p>
       </div>
 
-      {whatsapp.connected ? (
-        <p className="flex items-start gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
-          <span className="mt-1.5 h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-600" aria-hidden="true" />
-          <span>
-            <strong>WhatsApp connected.</strong> New messages arrive here by themselves within a few seconds.
-            {whatsapp.error && <span className="block text-red-700">Waiting to retry: {whatsapp.error}</span>}
-          </span>
-        </p>
-      ) : (
+      <ChannelBanner name="Telegram" status={channels.telegram} hint="Message your bot in Telegram." />
+      <ChannelBanner name="WhatsApp" status={channels.whatsapp} hint="Message the business WhatsApp number." />
+      {!channels.telegram.connected && !channels.whatsapp.connected && (
         <p className="rounded-xl bg-white p-3 text-xs text-zinc-500 shadow-sm">
-          WhatsApp isn&apos;t connected yet, so use the simulated messages or paste one below.
+          No messaging app is connected yet, so use the simulated messages or paste one below.
         </p>
       )}
 
@@ -70,6 +66,19 @@ export default function InboxTab({ state, whatsapp }: { state: AppState; whatsap
         ))}
       </ul>
     </div>
+  );
+}
+
+function ChannelBanner({ name, status, hint }: { name: string; status: ChannelStatus; hint: string }) {
+  if (!status.connected) return null;
+  return (
+    <p className="flex items-start gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
+      <span className="mt-1.5 h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-600" aria-hidden="true" />
+      <span>
+        <strong>{name} connected.</strong> {hint} New messages arrive here by themselves within a few seconds.
+        {status.error && <span className="block text-red-700">Waiting to retry: {status.error}</span>}
+      </span>
+    </p>
   );
 }
 
@@ -219,10 +228,13 @@ function MessageCard({ message }: { message: Message }) {
     <li className="rounded-xl bg-white p-3 shadow-sm">
       <div className="flex justify-between gap-2 text-sm">
         <span className="font-semibold text-zinc-900">
-          {message.senderName ?? `Unknown +91 ${message.phone}`}
+          {message.senderName ?? `Unknown ${contactLabel(message.phone)}`}
           {!message.senderName && message.profileName && <span className="font-normal text-zinc-500"> ({message.profileName})</span>}
           {message.source === "whatsapp" && (
             <span className="ml-1.5 rounded bg-emerald-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-emerald-800">WhatsApp</span>
+          )}
+          {message.source === "telegram" && (
+            <span className="ml-1.5 rounded bg-sky-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-sky-800">Telegram</span>
           )}
         </span>
         <span className="shrink-0 text-xs text-zinc-500">

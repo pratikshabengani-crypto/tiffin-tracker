@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { contactLabel } from "@/lib/contact";
 import { addCustomerFromMessage, resolveOutcome, setPrice } from "@/lib/actions";
 import { formatINR, MEAL_LABELS } from "@/lib/format";
 import { changesOn, mealsOn, summarizeAll, type DayChange } from "@/lib/rules/counts";
@@ -127,7 +128,7 @@ function AttentionItem({ message, outcome }: { message: Message; outcome: Outcom
   return (
     <li className="py-3 first:pt-0 last:pb-0 text-sm">
       <div className="flex justify-between gap-2">
-        <span className="font-medium text-zinc-900">{message.senderName ?? `Unknown number ${message.phone}`}</span>
+        <span className="font-medium text-zinc-900">{message.senderName ?? `Unknown ${contactLabel(message.phone)}`}</span>
         <span className="shrink-0 text-xs text-zinc-500">{formatTime(message.receivedAt)}</span>
       </div>
       <p className="mt-0.5 italic text-zinc-600">“{message.text}”</p>
@@ -196,7 +197,7 @@ function AddCustomer({ message, outcome, onHandled }: { message: Message; outcom
           ))}
         </select>
       </label>
-      <p className="text-[11px] text-zinc-500">Phone +91 {message.phone}. Their next messages will be recognised.</p>
+      <p className="text-[11px] text-zinc-500">{contactLabel(message.phone)}. Their next messages will be recognised.</p>
       <div className="flex gap-2">
         <Button primary onClick={save}>Save customer</Button>
         <Button onClick={() => setOpen(false)}>Cancel</Button>

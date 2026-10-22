@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { contactLabel, isTelegram } from "@/lib/contact";
 import { formatINR, MEAL_LABELS } from "@/lib/format";
 import type { DayStatus, SubscriptionSummary } from "@/lib/rules/subscriptions";
 import { dateRange, formatDay, formatTime, istDate } from "@/lib/rules/time";
@@ -51,9 +52,13 @@ export default function SubscriberCalendar({ state, summary, customer, today, on
         <p className="text-sm text-zinc-500">
           {plan.label} · {formatINR(plan.price)} · started {formatDay(summary.sub.startDate)}
         </p>
-        <a href={`tel:+91${customer.phone}`} className="text-sm text-emerald-700">
-          +91 {customer.phone}
-        </a>
+        {isTelegram(customer.phone) ? (
+          <span className="text-sm text-zinc-500">{contactLabel(customer.phone)}</span>
+        ) : (
+          <a href={`tel:+91${customer.phone}`} className="text-sm text-emerald-700">
+            {contactLabel(customer.phone)}
+          </a>
+        )}
         <PaymentLine summary={summary} />
       </section>
 

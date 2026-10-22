@@ -1,3 +1,4 @@
+import { isTelegram, normalizePhone } from "./contact";
 import { formatINR, MEAL_LABELS } from "./format";
 import { BUSINESS_NAME } from "./reminders";
 import { summarizeAll } from "./rules/counts";
@@ -22,9 +23,7 @@ const MAX_RANGE_DAYS = 31;
 let counter = 0;
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${(counter++).toString(36)}`;
 
-export function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, "").slice(-10);
-}
+export { normalizePhone };
 
 export function findCustomer(state: AppState, phone: string): Customer | undefined {
   const wanted = normalizePhone(phone);
@@ -79,7 +78,7 @@ export function applyMessage(state: AppState, incoming: IncomingMessage, underst
     outcome({
       status: "attention",
       summary: wants.length > 0 ? wants.join("; ") : understanding.summary,
-      reason: "This number isn't one of your customers yet.",
+      reason: isTelegram(incoming.phone) ? "This person isn't one of your customers yet." : "This number isn't one of your customers yet.",
     });
   } else {
     for (const request of requests) {

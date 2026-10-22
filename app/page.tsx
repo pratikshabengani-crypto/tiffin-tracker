@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import InboxTab, { type WhatsAppStatus } from "@/components/InboxTab";
+import InboxTab, { type Channels } from "@/components/InboxTab";
 import MonthlyTab from "@/components/MonthlyTab";
 import PaymentsScreen from "@/components/PaymentsScreen";
 import SingleTab from "@/components/SingleTab";
 import TodayTab from "@/components/TodayTab";
 import { BUSINESS_NAME } from "@/lib/reminders";
-import { pullWhatsApp } from "@/lib/process";
+import { pullTelegram, pullWhatsApp } from "@/lib/process";
 import { getState, subscribe } from "@/lib/store";
 
 type Tab = "today" | "monthly" | "single" | "inbox";
@@ -61,16 +61,19 @@ function Dashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  // Every 8 s, pick up any real WhatsApp messages waiting in the mailbox.
-  const [whatsapp, setWhatsapp] = useState<WhatsAppStatus>({ connected: false });
+  // Every 8 s, pick up any real WhatsApp or Telegram messages.
+  const [channels, setChannels] = useState<Channels>({ whatsapp: { connected: false }, telegram: { connected: false } });
   useEffect(() => {
     let running = false;
     const check = async () => {
       if (running) return;
       running = true;
       try {
-        const result = await pullWhatsApp();
-        setWhatsapp({ connected: result.connected, error: result.error });
+        const [whatsapp, telegram] = await Promise.all([pullWhatsApp(), pullTelegram()]);
+        setChannels({
+          whatsapp: { connected: whatsapp.connected, error: whatsapp.error },
+          telegram: { connected: telegram.connected, error: telegram.error },
+        });
       } finally {
         running = false;
       }
@@ -97,7 +100,7 @@ function Dashboard() {
             {tab === "today" && <TodayTab state={state} onOpenPayments={openPayments} />}
             {tab === "monthly" && <MonthlyTab state={state} />}
             {tab === "single" && <SingleTab state={state} onOpenPayments={openPayments} />}
-            {tab === "inbox" && <InboxTab state={state} whatsapp={whatsapp} />}
+            {tab === "inbox" && <InboxTab state={state} channels={channels} />}
           </>
         )}
       </main>

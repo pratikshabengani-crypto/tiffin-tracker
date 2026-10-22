@@ -27,7 +27,7 @@ export type Message = {
   image?: string;
   summary?: string; // what the AI understood
   aiMs?: number; // how long the AI took to read it
-  source?: "whatsapp"; // came in through the real WhatsApp connection
+  source?: "whatsapp" | "telegram"; // came in through a real messaging connection
   profileName?: string; // sender's WhatsApp display name
   outcomes: Outcome[];
 };
@@ -38,6 +38,7 @@ export type AppState = Facts & {
   messages: Message[];
   demoCursor: number; // next simulated WhatsApp message
   waCursor?: number; // how many real WhatsApp messages have been picked up
+  tgOffset?: number; // next Telegram update to ask for
 };
 
 // Everything runs on the real current time.

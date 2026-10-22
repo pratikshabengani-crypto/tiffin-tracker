@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { decidePayment, recordPayment } from "@/lib/actions";
+import { isTelegram } from "@/lib/contact";
 import { formatINR, MEAL_LABELS } from "@/lib/format";
 import { reminderText, screenshotRequestText, whatsappLink } from "@/lib/reminders";
 import { isDuplicateUtr, paymentRows, type PaymentRow, type PayStatus } from "@/lib/rules/paymentStatus";
@@ -129,14 +130,16 @@ function PaymentCard({
 
       {row.totalDue > 0 && row.pending.length === 0 && !recording && (
         <div className="mt-2 flex flex-wrap gap-2">
-          <a
-            href={whatsappLink(row.customer.phone, reminderText(row))}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white"
-          >
-            Remind on WhatsApp
-          </a>
+          {!isTelegram(row.customer.phone) && (
+            <a
+              href={whatsappLink(row.customer.phone, reminderText(row))}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white"
+            >
+              Remind on WhatsApp
+            </a>
+          )}
           <SmallButton onClick={() => setRecording(true)}>Mark paid</SmallButton>
         </div>
       )}
@@ -236,7 +239,7 @@ function PendingPayment({
             ✓ Received
           </button>
           <SmallButton onClick={() => setRejecting(true)}>✗ Not received</SmallButton>
-          {payment.evidence !== "screenshot" && (
+          {payment.evidence !== "screenshot" && !isTelegram(row.customer.phone) && (
             <a
               href={whatsappLink(row.customer.phone, screenshotRequestText(row.customer.name))}
               target="_blank"

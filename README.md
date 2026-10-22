@@ -31,6 +31,14 @@ OPENROUTER_API_KEY=your-key-here
 
 Then open http://localhost:3000 and use **Inbox → Play next message**.
 
+## Telegram connection (easiest live demo)
+
+1. In Telegram, chat with **@BotFather**, send `/newbot`, and copy the token it gives you.
+2. Add `TELEGRAM_BOT_TOKEN=<token>` to `.env.local` (and to Vercel → Settings → Environment Variables).
+3. Restart the app. Anyone who messages the bot shows up in the Inbox within a few seconds.
+
+The app asks Telegram for new messages every few seconds (`/api/telegram`), so no webhook or database is needed. Telegram doesn't share phone numbers, so the first message from a person shows as unknown; tap **Add as customer** once and they're recognised after that.
+
 ## WhatsApp connection (optional)
 
 Real WhatsApp messages come in through Meta's WhatsApp Cloud API:

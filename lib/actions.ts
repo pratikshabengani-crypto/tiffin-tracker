@@ -1,3 +1,4 @@
+import { normalizePhone } from "./contact";
 import type { AppState } from "./state";
 import { STANDARD_PRICES, type Customer, type Meal, type Payment, type PaymentMethod, type PlanId } from "./types";
 
@@ -8,7 +9,7 @@ function newId(prefix: string): string {
 // ---- customers and single orders ----------------------------------------------
 
 export function addCustomer(state: AppState, name: string, phone: string): { state: AppState; customer: Customer } {
-  const customer: Customer = { id: newId("c"), name: name.trim(), phone: phone.replace(/\D/g, "").slice(-10) };
+  const customer: Customer = { id: newId("c"), name: name.trim(), phone: normalizePhone(phone) };
   return { state: { ...state, customers: [...state.customers, customer] }, customer };
 }
 

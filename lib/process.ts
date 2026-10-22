@@ -10,7 +10,7 @@ export type IncomingDraft = {
   receivedAt: string;
   text: string;
   image?: string;
-  source?: "whatsapp";
+  source?: "whatsapp" | "telegram";
   profileName?: string;
 };
 
@@ -50,6 +50,42 @@ export async function processMessage(draft: IncomingDraft): Promise<{ ok: true; 
     };
   });
   return { ok: true, ms };
+}
+
+let telegramPausedUntil = 0;
+
+// Picks up messages sent to the Telegram bot and processes them in order.
+// Telegram is only told a message is handled once it has been processed here.
+export async function pullTelegram(): Promise<{ connected: boolean; processed: number; error?: string }> {
+  if (Date.now() < telegramPausedUntil) return { connected: true, processed: 0 };
+
+  const offset = getState().tgOffset ?? 0;
+  let data: { connected?: boolean; messages?: MailboxMessage[]; next?: number; error?: string };
+  try {
+    const res = await fetch(`/api/telegram?offset=${offset}`);
+    data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+  } catch {
+    telegramPausedUntil = Date.now() + 60_000;
+    return { connected: true, processed: 0, error: "Couldn't check Telegram for messages." };
+  }
+  if (!data.connected) return { connected: false, processed: 0 };
+
+  let processed = 0;
+  for (const m of data.messages ?? []) {
+    const result = await processMessage({ phone: m.from, receivedAt: m.receivedAt, text: m.text, image: m.image, source: "telegram", profileName: m.profileName });
+    if (!result.ok) {
+      // Ask again from this message next time.
+      const updateId = Number(m.id.replace("tg-", ""));
+      updateState((s) => ({ ...s, tgOffset: Math.max(s.tgOffset ?? 0, updateId) }));
+      telegramPausedUntil = Date.now() + 60_000;
+      return { connected: true, processed, error: result.error };
+    }
+    processed++;
+  }
+  // Everything handled (including skipped /start commands): move past them.
+  if (data.next !== undefined && data.next > offset) updateState((s) => ({ ...s, tgOffset: data.next }));
+  return { connected: true, processed };
 }
 
 let pausedUntil = 0;
