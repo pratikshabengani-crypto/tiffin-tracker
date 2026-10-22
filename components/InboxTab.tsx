@@ -28,7 +28,7 @@ export default function InboxTab({ state, channels }: { state: AppState; channel
       )}
 
       {messages.length === 0 && <p className="px-1 text-sm text-zinc-500">No messages yet.</p>}
-      <ul className="space-y-2">
+      <ul className="space-y-2 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
         {messages.map((m) => (
           <MessageCard key={m.id} message={m} />
         ))}

@@ -76,6 +76,7 @@ export default function SingleTab({ state, onOpenPayments }: Props) {
         </button>
       )}
 
+      <div className="space-y-3 lg:grid lg:grid-cols-3 lg:items-start lg:gap-4 lg:space-y-0">
       {MEALS.map((meal) => {
         const list = orders.filter((o) => o.meal === meal);
         const count = list.filter((o) => o.status === "active").reduce((total, o) => total + o.quantity, 0);
@@ -105,6 +106,7 @@ export default function SingleTab({ state, onOpenPayments }: Props) {
           </section>
         );
       })}
+      </div>
     </div>
   );
 }

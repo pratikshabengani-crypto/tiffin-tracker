@@ -56,7 +56,7 @@ export default function PaymentsScreen({ state, onBack }: Props) {
                 Show {list.length} paid
               </button>
             ) : (
-              <ul className="mt-2 space-y-2">
+              <ul className="mt-2 space-y-2 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
                 {list.map((row) => (
                   <PaymentCard key={row.customer.id} row={row} state={state} now={now} onView={setViewing} />
                 ))}

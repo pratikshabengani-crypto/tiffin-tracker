@@ -43,7 +43,7 @@ export default function SubscriberCalendar({ state, summary, customer, today, on
 
   return (
     <div className="space-y-3">
-      <button type="button" onClick={onBack} className="text-sm font-medium text-emerald-700">
+      <button type="button" onClick={onBack} className="text-sm font-medium text-emerald-700 lg:hidden">
         ← All subscribers
       </button>
 

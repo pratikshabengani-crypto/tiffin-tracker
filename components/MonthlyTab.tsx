@@ -49,17 +49,6 @@ export default function MonthlyTab({ state }: { state: AppState }) {
   const visible = rows.filter(matches);
 
   const selectedRow = rows.find((r) => r.summary.sub.id === selected);
-  if (selectedRow) {
-    return (
-      <SubscriberCalendar
-        state={state}
-        summary={selectedRow.summary}
-        customer={selectedRow.customer}
-        today={today}
-        onBack={() => setSelected(null)}
-      />
-    );
-  }
 
   const chips: { id: Filter; label: string; count: number }[] = [
     { id: "all", label: "All", count: rows.length },
@@ -67,8 +56,25 @@ export default function MonthlyTab({ state }: { state: AppState }) {
     { id: "ending", label: "Ending soon", count: rows.filter((r) => endingSoon(r.summary)).length },
   ];
 
+  // Phones: the list, or one person's calendar. Laptops: list on the left, calendar on the right.
   return (
-    <div className="space-y-3">
+    <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-start lg:gap-6">
+      <div className={selectedRow ? "lg:sticky lg:top-4 lg:order-2" : "hidden lg:block lg:order-2"}>
+        {selectedRow ? (
+          <SubscriberCalendar
+            state={state}
+            summary={selectedRow.summary}
+            customer={selectedRow.customer}
+            today={today}
+            onBack={() => setSelected(null)}
+          />
+        ) : (
+          <div className="rounded-xl bg-white p-8 text-center text-sm text-zinc-500 shadow-sm">
+            Pick a subscriber to see their calendar.
+          </div>
+        )}
+      </div>
+    <div className={`space-y-3 lg:order-1 ${selectedRow ? "hidden lg:block" : ""}`}>
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Monthly subscribers</h1>
         <p className="text-sm text-zinc-500">{rows.length} active plans</p>
@@ -131,7 +137,10 @@ export default function MonthlyTab({ state }: { state: AppState }) {
                   <button
                     type="button"
                     onClick={() => setSelected(r.summary.sub.id)}
-                    className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-zinc-50"
+                    aria-current={selected === r.summary.sub.id ? "true" : undefined}
+                    className={`flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-zinc-50 ${
+                      selected === r.summary.sub.id ? "lg:bg-emerald-50" : ""
+                    }`}
                   >
                     <span className="flex items-center gap-2.5">
                       <Initials name={r.customer.name} />
@@ -145,6 +154,7 @@ export default function MonthlyTab({ state }: { state: AppState }) {
           </section>
         );
       })}
+    </div>
     </div>
   );
 }

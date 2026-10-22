@@ -58,9 +58,9 @@ export default function TodayTab({ state, onOpenPayments }: Props) {
         </p>
       </div>
 
-      <section aria-label="Meals to cook today" className="grid grid-cols-3 gap-2">
+      <section aria-label="Meals to cook today" className="grid grid-cols-3 gap-2 lg:gap-4">
         {MEALS.map((meal) => (
-          <div key={meal} className={`rounded-xl border-t-4 bg-white p-3 shadow-sm ${MEAL_STYLE[meal].border}`}>
+          <div key={meal} className={`rounded-xl border-t-4 bg-white p-3 shadow-sm lg:p-5 ${MEAL_STYLE[meal].border}`}>
             <div className="flex items-center justify-between text-xs font-medium text-zinc-600">
               {MEAL_LABELS[meal]}
               <span className={`flex h-6 w-6 items-center justify-center rounded-full ${MEAL_STYLE[meal].badge}`} aria-hidden="true">
@@ -69,7 +69,7 @@ export default function TodayTab({ state, onOpenPayments }: Props) {
                 </svg>
               </span>
             </div>
-            <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums text-zinc-900">{counts[meal].total}</div>
+            <div className="mt-1 text-3xl font-extrabold tracking-tight tabular-nums text-zinc-900 lg:text-5xl">{counts[meal].total}</div>
             <div className="text-[11px] leading-tight text-zinc-500">
               {counts[meal].subscribers} plan{counts[meal].single > 0 && ` + ${counts[meal].single} single`}
             </div>
@@ -78,21 +78,34 @@ export default function TodayTab({ state, onOpenPayments }: Props) {
         ))}
       </section>
 
-      {attention.length > 0 && (
-        <Card title={`Needs your attention (${attention.length})`} tone="amber">
-          <ul className="divide-y divide-amber-100">
-            {attention.map(({ message, outcome }) => (
-              <AttentionItem key={outcome.id} message={message} outcome={outcome} />
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      <MoneyCard rows={rows} onOpen={onOpenPayments} />
-
-      <ChangesCard changes={changes} />
-
-      <PricesCard state={state} date={addDays(today, 1)} now={now} />
+      {/* Phones: one column (attention, money, changes, prices).
+          Laptops: attention + changes on the left, money + prices on the right. */}
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5">
+        <div className="contents lg:flex lg:flex-col lg:gap-5">
+          {attention.length > 0 && (
+            <div className="order-1 lg:order-none">
+              <Card title={`Needs your attention (${attention.length})`} tone="amber">
+                <ul className="divide-y divide-amber-100">
+                  {attention.map(({ message, outcome }) => (
+                    <AttentionItem key={outcome.id} message={message} outcome={outcome} />
+                  ))}
+                </ul>
+              </Card>
+            </div>
+          )}
+          <div className="order-3 lg:order-none">
+            <ChangesCard changes={changes} />
+          </div>
+        </div>
+        <div className="contents lg:flex lg:flex-col lg:gap-5">
+          <div className="order-2 lg:order-none">
+            <MoneyCard rows={rows} onOpen={onOpenPayments} />
+          </div>
+          <div className="order-4 lg:order-none">
+            <PricesCard state={state} date={addDays(today, 1)} now={now} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

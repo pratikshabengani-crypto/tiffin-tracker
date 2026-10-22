@@ -39,7 +39,7 @@ export default function Home() {
 function AppHeader() {
   return (
     <header className="bg-emerald-800 text-white">
-      <div className="mx-auto flex max-w-md items-center gap-2.5 px-4 py-3">
+      <div className="mx-auto flex max-w-md items-center gap-2.5 px-4 py-3 lg:max-w-7xl lg:px-6">
         <TiffinLogo />
         <div className="leading-tight">
           <div className="text-base font-bold tracking-tight">Tiffin Tracker</div>
@@ -89,48 +89,71 @@ function Dashboard() {
     window.scrollTo(0, 0);
   };
 
+  const goTo = (id: Tab) => {
+    setTab(id);
+    setPaymentsOpen(false);
+  };
+  const isActive = (id: Tab) => tab === id && !paymentsOpen;
+
   return (
     <div className="min-h-full flex-1 bg-zinc-100 text-zinc-900">
       <AppHeader />
-      <main className="mx-auto max-w-md px-4 pb-28 pt-4">
-        {paymentsOpen ? (
-          <PaymentsScreen state={state} onBack={() => setPaymentsOpen(false)} />
-        ) : (
-          <>
-            {tab === "today" && <TodayTab state={state} onOpenPayments={openPayments} />}
-            {tab === "monthly" && <MonthlyTab state={state} />}
-            {tab === "single" && <SingleTab state={state} onOpenPayments={openPayments} />}
-            {tab === "inbox" && <InboxTab state={state} channels={channels} />}
-          </>
-        )}
-      </main>
+      {/* Phones: one column with tabs at the bottom. Laptops (lg): tabs in a left sidebar, wide content. */}
+      <div className="lg:mx-auto lg:flex lg:max-w-7xl lg:gap-8 lg:px-6">
+        <aside className="hidden lg:block lg:w-52 lg:shrink-0">
+          <nav aria-label="Sections" className="sticky top-4 mt-6 space-y-1">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => goTo(t.id)}
+                aria-current={isActive(t.id) ? "page" : undefined}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm ${
+                  isActive(t.id) ? "bg-emerald-100 font-semibold text-emerald-900" : "text-zinc-600 hover:bg-white"
+                }`}
+              >
+                <TabIcon path={t.icon} />
+                {t.label}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        <main className="mx-auto max-w-md px-4 pb-28 pt-4 lg:mx-0 lg:max-w-none lg:flex-1 lg:px-0 lg:pb-12 lg:pt-6">
+          {paymentsOpen ? (
+            <PaymentsScreen state={state} onBack={() => setPaymentsOpen(false)} />
+          ) : (
+            <>
+              {tab === "today" && <TodayTab state={state} onOpenPayments={openPayments} />}
+              {tab === "monthly" && <MonthlyTab state={state} />}
+              {tab === "single" && <SingleTab state={state} onOpenPayments={openPayments} />}
+              {tab === "inbox" && <InboxTab state={state} channels={channels} />}
+            </>
+          )}
+        </main>
+      </div>
 
       <nav
         aria-label="Sections"
-        className="fixed inset-x-0 bottom-0 border-t border-zinc-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+        className="fixed inset-x-0 bottom-0 border-t border-zinc-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
       >
         <div className="mx-auto flex max-w-md px-2">
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
-              onClick={() => {
-                setTab(t.id);
-                setPaymentsOpen(false);
-              }}
-              aria-current={tab === t.id && !paymentsOpen ? "page" : undefined}
+              onClick={() => goTo(t.id)}
+              aria-current={isActive(t.id) ? "page" : undefined}
               className={`flex flex-1 flex-col items-center gap-0.5 pb-2 pt-1.5 text-[11px] ${
-                tab === t.id && !paymentsOpen ? "font-semibold text-emerald-800" : "text-zinc-500"
+                isActive(t.id) ? "font-semibold text-emerald-800" : "text-zinc-500"
               }`}
             >
               <span
                 className={`flex h-8 w-14 items-center justify-center rounded-full transition-colors ${
-                  tab === t.id && !paymentsOpen ? "bg-emerald-100" : ""
+                  isActive(t.id) ? "bg-emerald-100" : ""
                 }`}
               >
-                <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d={t.icon} />
-                </svg>
+                <TabIcon path={t.icon} />
               </span>
               {t.label}
             </button>
@@ -138,6 +161,14 @@ function Dashboard() {
         </div>
       </nav>
     </div>
+  );
+}
+
+function TabIcon({ path }: { path: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={path} />
+    </svg>
   );
 }
 
