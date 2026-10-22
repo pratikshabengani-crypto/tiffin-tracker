@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tiffin Tracker
 
-## Getting Started
+A phone dashboard for a small home tiffin (meal) business in Bengaluru. Customers send WhatsApp messages like *"kal lunch nahi chahiye"* or a payment screenshot; an AI reads each one and the dashboard updates itself: meals to cook today, monthly subscribers' calendars, single-meal orders and who still owes money. The owner only handles the few things that need a human.
 
-First, run the development server:
+## What's in it
+
+- **Today**: breakfast / lunch / dinner counts, changes today, "Needs your attention", money to collect, tomorrow's single-meal prices.
+- **Monthly**: ~110 subscribers grouped by plan, with a calendar per person (🟢 eating, 🔴 skipped in time, 🟠 skipped late) and up to 5 carry-forwards per meal.
+- **Single**: single-meal orders by day, with a running account (khata) per customer.
+- **Payments**: 🔵 screenshots to check, 🟡 "says paid", 🔴 no payment yet, 🟢 paid. Nothing counts as received until the owner taps ✓. One-tap WhatsApp reminders she sends herself.
+- **Inbox**: every message, what the AI understood and what changed. A demo feed plays 15 messages through a day.
+
+## How the "brain" works
+
+1. **AI understands** (`app/api/understand/route.ts`): Gemini Flash (via OpenRouter) fills in a fixed form for each message: skip, pause, order, payment, renewal… It never invents details and flags anything vague.
+2. **Rules decide** (`lib/applyMessage.ts`, `lib/rules/`): plain code applies the owner's rules (cutoffs: breakfast 10 pm the day before, lunch 10 am, dinner 5 pm; 30-day plans; 5 carry-forwards per meal; payments only on her confirmation).
+3. **Screens calculate** everything from stored facts, so the numbers can't disagree with each other.
+
+## Run it locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Create `.env.local` (never committed) with an OpenRouter key:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+OPENROUTER_API_KEY=your-key-here
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Then open http://localhost:3000 and use **Inbox → Play next message**.
 
-## Learn More
+## Tests
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm test
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The live AI check (costs a little, needs the app running) is skipped unless you ask for it:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```powershell
+$env:LIVE_AI='1'; npx vitest run lib/ai.live.test.ts
+```
 
-## Deploy on Vercel
+## Demo notes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- All customers, names, phone numbers and payment screenshots are made up. Screenshots are labelled "SAMPLE".
+- Data is stored in the browser. A real version would use an online database and the official WhatsApp Business connection.

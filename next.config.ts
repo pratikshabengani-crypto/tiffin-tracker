@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Hide the Next.js badge so it doesn't cover the bottom tab bar during demos.
+  devIndicators: false,
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
