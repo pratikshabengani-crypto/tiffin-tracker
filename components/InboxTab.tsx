@@ -19,8 +19,8 @@ export default function InboxTab({ state, channels }: { state: AppState; channel
         <p className="text-sm text-zinc-500">Customer messages, and what the app did with each one.</p>
       </div>
 
-      <ChannelBanner name="Telegram" status={channels.telegram} hint="Message your bot in Telegram." />
-      <ChannelBanner name="WhatsApp" status={channels.whatsapp} hint="Message the business WhatsApp number." />
+      <ChannelProblem name="Telegram" status={channels.telegram} />
+      <ChannelProblem name="WhatsApp" status={channels.whatsapp} />
       {!channels.telegram.connected && !channels.whatsapp.connected && (
         <p className="rounded-xl bg-white p-3 text-xs text-zinc-500 shadow-sm">
           No messaging app is connected yet. Add your Telegram bot token to start receiving messages.
@@ -47,15 +47,12 @@ export default function InboxTab({ state, channels }: { state: AppState; channel
   );
 }
 
-function ChannelBanner({ name, status, hint }: { name: string; status: ChannelStatus; hint: string }) {
-  if (!status.connected) return null;
+// Only shown when a connected messaging app has a problem (e.g. the AI couldn't read a message).
+function ChannelProblem({ name, status }: { name: string; status: ChannelStatus }) {
+  if (!status.connected || !status.error) return null;
   return (
-    <p className="flex items-start gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900 ring-1 ring-emerald-200">
-      <span className="mt-1.5 h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-600" aria-hidden="true" />
-      <span>
-        <strong>{name} connected.</strong> {hint} New messages arrive here by themselves within a few seconds.
-        {status.error && <span className="block text-red-700">Waiting to retry: {status.error}</span>}
-      </span>
+    <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
+      {name}: {status.error} Retrying in a minute.
     </p>
   );
 }
