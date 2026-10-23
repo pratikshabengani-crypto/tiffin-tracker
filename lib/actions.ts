@@ -1,3 +1,4 @@
+import { applyMessage } from "./applyMessage";
 import { normalizePhone } from "./contact";
 import type { AppState, Resolution } from "./state";
 import { STANDARD_PRICES, type Customer, type Meal, type Payment, type PaymentMethod, type PlanId } from "./types";
@@ -46,6 +47,19 @@ export function addCustomerFromMessage(
   if (planId) {
     next = { ...next, subscriptions: [...next.subscriptions, { id: newId("s"), customerId: added.customer.id, planId, startDate }] };
   }
+
+  // Now that we know who they are, apply what their message asked for, judged at the time it was sent.
+  if (message.understanding) {
+    const without = { ...next, messages: next.messages.filter((m) => m.id !== messageId) };
+    const reapplied = applyMessage(without, { id: message.id, phone: message.phone, receivedAt: message.receivedAt, text: message.text, image: message.image }, message.understanding);
+    return {
+      ...reapplied,
+      messages: reapplied.messages.map((m) =>
+        m.id === messageId ? { ...m, aiMs: message.aiMs, source: message.source, profileName: message.profileName } : m,
+      ),
+    };
+  }
+
   next = resolveOutcome(next, messageId, outcomeId, "dismissed");
   return { ...next, messages: next.messages.map((m) => (m.id === messageId ? { ...m, senderName: added.customer.name, settled: undefined } : m)) };
 }

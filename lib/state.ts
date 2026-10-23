@@ -1,4 +1,5 @@
 import type { Facts, MealChange, SingleOrder, Subscription } from "./types";
+import type { Understanding } from "./understandSchema";
 
 // Something the owner can approve from "Needs attention".
 export type PendingAction =
@@ -34,6 +35,7 @@ export type Message = {
   profileName?: string; // sender's WhatsApp display name
   outcomes: Outcome[];
   settled?: boolean; // set when the owner marks the whole message settled / not settled
+  understanding?: Understanding; // kept for messages from strangers, applied once they're added as a customer
 };
 
 export type AppState = Facts & {

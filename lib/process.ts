@@ -46,7 +46,12 @@ export async function processMessage(draft: IncomingDraft): Promise<{ ok: true; 
     const next = applyMessage(s, { id, phone, receivedAt: draft.receivedAt, text: draft.text, image }, data.understanding!);
     return {
       ...next,
-      messages: next.messages.map((m) => (m.id === id ? { ...m, aiMs: ms, source: draft.source, profileName: draft.profileName } : m)),
+      // A stranger's message keeps what the AI understood, so it can be applied once they're added as a customer.
+      messages: next.messages.map((m) =>
+        m.id === id
+          ? { ...m, aiMs: ms, source: draft.source, profileName: draft.profileName, understanding: m.senderName ? undefined : data.understanding }
+          : m,
+      ),
     };
   });
   return { ok: true, ms };

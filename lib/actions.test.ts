@@ -1,11 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { addCustomer, addCustomerFromMessage, addOrder, addSubscriber, cancelOrder, decidePayment, recordPayment, setNotDelivered, setPrice } from "./actions";
+import { addCustomer, addCustomerFromMessage, addOrder, addSubscriber, cancelOrder, decidePayment, recordPayment, resolveOutcome, setNotDelivered, setPrice } from "./actions";
 import { findCustomer } from "./applyMessage";
 import { needsAttention } from "./state";
 import { TEST_DAY, demoState } from "./demo/seed";
 import { khataFor } from "./rules/khata";
 import { paymentRows } from "./rules/paymentStatus";
-import { istInstant } from "./rules/time";
+import { addDays, istInstant } from "./rules/time";
+import { mealsOn } from "./rules/counts";
+import { applyMessage } from "./applyMessage";
+import type { AiRequest, Understanding } from "./understandSchema";
+
+const emptyRequest: AiRequest = {
+  kind: "other",
+  meals: [],
+  start_date: null,
+  end_date: null,
+  quantity: null,
+  amount: null,
+  payment_method: null,
+  utr: null,
+  screenshot_status: "no_screenshot",
+  paid_to: null,
+  plan: null,
+  note: "",
+};
 
 const now = istInstant(TEST_DAY, 7, 30).toISOString();
 const later = istInstant(TEST_DAY, 13).toISOString();
@@ -99,5 +117,42 @@ describe("addSubscriber", () => {
     const { state: next, customer } = addSubscriber(state, { name: "Someone else", phone: existing.phone, planId: "dinner", startDate: TEST_DAY });
     expect(customer.id).toBe(existing.id);
     expect(next.customers).toHaveLength(state.customers.length);
+  });
+});
+
+describe("addCustomerFromMessage re-reads the message", () => {
+  // A stranger on Telegram asks for 2 extra breakfasts today (late) and 1 lunch tomorrow (on time).
+  function strangerOrder() {
+    const understanding: Understanding = {
+      requests: [
+        { ...emptyRequest, kind: "single_order", meals: ["breakfast"], quantity: 2, start_date: TEST_DAY, note: "2 breakfasts today" },
+        { ...emptyRequest, kind: "single_order", meals: ["lunch"], quantity: 1, start_date: addDays(TEST_DAY, 1), note: "1 lunch tomorrow" },
+      ],
+      unclear: [],
+      confidence: "high",
+      summary: "Wants 2 breakfasts today and a lunch tomorrow",
+    };
+    const base = demoState(TEST_DAY);
+    const sent = applyMessage(base, { id: "m-stranger", phone: "tg:555", receivedAt: istInstant(TEST_DAY, 7).toISOString(), text: "2 extra breakfasts today, lunch tomorrow" }, understanding);
+    const state = { ...sent, messages: sent.messages.map((m) => (m.id === "m-stranger" ? { ...m, understanding } : m)) };
+    return { base, state, outcomeId: state.messages.at(-1)!.outcomes[0].id };
+  }
+
+  it("changes nothing until the stranger is added", () => {
+    const { base, state } = strangerOrder();
+    expect(state.singleOrders).toHaveLength(base.singleOrders.length);
+  });
+
+  it("applies their requests once added, with the cutoffs of when they wrote", () => {
+    const { base, state, outcomeId } = strangerOrder();
+    const added = addCustomerFromMessage(state, "m-stranger", outcomeId, "Pratiksha B", null, TEST_DAY);
+    const message = added.messages.find((m) => m.id === "m-stranger")!;
+    expect(message.senderName).toBe("Pratiksha B");
+    expect(message.outcomes.map((o) => o.status)).toEqual(["attention", "applied"]);
+    expect(mealsOn(added, addDays(TEST_DAY, 1)).lunch.total).toBe(mealsOn(base, addDays(TEST_DAY, 1)).lunch.total + 1);
+
+    // "Add 2 breakfasts today – settled" then puts them into today's count.
+    const done = resolveOutcome(added, "m-stranger", message.outcomes[0].id, "approved");
+    expect(mealsOn(done, TEST_DAY).breakfast.total).toBe(mealsOn(base, TEST_DAY).breakfast.total + 2);
   });
 });

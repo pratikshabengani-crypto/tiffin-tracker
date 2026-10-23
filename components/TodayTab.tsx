@@ -9,7 +9,8 @@ import { canChangePrice, priceFor } from "@/lib/rules/orders";
 import { paymentRows } from "@/lib/rules/paymentStatus";
 import type { SubscriptionSummary } from "@/lib/rules/subscriptions";
 import { addDays, cutoffFor, cutoffStatus, formatDay, formatTime, istDate, istHour } from "@/lib/rules/time";
-import { needsAttention, nowOf, type AppState, type Message, type Outcome, type Resolution } from "@/lib/state";
+import { choicesFor, type Choice } from "@/lib/choices";
+import { needsAttention, nowOf, type AppState, type Message, type Outcome } from "@/lib/state";
 import { updateState } from "@/lib/store";
 import { MEALS, PLANS, STANDARD_PRICES, type Meal, type PlanId } from "@/lib/types";
 
@@ -96,7 +97,7 @@ export default function TodayTab({ state, onOpenPayments }: Props) {
               <Card title={`Needs your attention (${attention.length})`} tone="amber">
                 <ul className="divide-y divide-amber-100">
                   {attention.map(({ message, outcome }) => (
-                    <AttentionItem key={outcome?.id ?? message.id} message={message} outcome={outcome} />
+                    <AttentionItem key={outcome?.id ?? message.id} state={state} message={message} outcome={outcome} now={now} />
                   ))}
                 </ul>
               </Card>
@@ -209,26 +210,8 @@ function Card({ title, tone, children }: { title: string; tone?: "amber"; childr
   );
 }
 
-type Choice = Resolution | "add_customer";
-
-// The options in an item's "Choose what to do" menu.
-function choicesFor(message: Message, outcome?: Outcome): { value: Choice; label: string }[] {
-  const type = outcome?.action?.type;
-  const choices: { value: Choice; label: string }[] =
-    type === "allow_late_skip"
-      ? [{ value: "approved", label: "Allow skip" }, { value: "dismissed", label: "Keep the meal" }]
-      : type === "allow_late_cancel"
-        ? [{ value: "approved", label: "Don't charge" }, { value: "dismissed", label: "Charge anyway" }]
-        : outcome?.action
-          ? [{ value: "approved", label: "Accept" }, { value: "dismissed", label: "Decline" }]
-          : [];
-  if (!message.senderName) choices.push({ value: "add_customer", label: "Add as customer" });
-  choices.push({ value: "settled", label: "Settled" });
-  return choices;
-}
-
-function AttentionItem({ message, outcome }: { message: Message; outcome?: Outcome }) {
-  const [choice, setChoice] = useState<Choice | "">("");
+function AttentionItem({ state, message, outcome, now }: { state: AppState; message: Message; outcome?: Outcome; now: string }) {
+  const [choice, setChoice] = useState<Choice["value"] | "">("");
   const [adding, setAdding] = useState(false);
 
   const done = () => {
@@ -253,14 +236,14 @@ function AttentionItem({ message, outcome }: { message: Message; outcome?: Outco
           <>
             <select
               value={choice}
-              onChange={(e) => setChoice(e.target.value as Choice)}
+              onChange={(e) => setChoice(e.target.value as Choice["value"])}
               aria-label="What to do with this message"
               className="min-h-9 min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-800"
             >
               <option value="" disabled>
                 Choose what to do…
               </option>
-              {choicesFor(message, outcome).map((c) => (
+              {choicesFor(state, message, outcome, now).map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
                 </option>

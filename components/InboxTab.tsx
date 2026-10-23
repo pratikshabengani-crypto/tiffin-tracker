@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { contactLabel } from "@/lib/contact";
 import { formatDay, formatTime, istDate } from "@/lib/rules/time";
-import { setSettled } from "@/lib/actions";
-import { isSettled, type AppState, type Message, type Outcome, type Resolution } from "@/lib/state";
+import { resolveOutcome, setSettled } from "@/lib/actions";
+import { choicesFor, type Choice } from "@/lib/choices";
+import { isSettled, nowOf, type AppState, type Message, type Outcome, type Resolution } from "@/lib/state";
 import { resetDemo, updateState } from "@/lib/store";
 
 export type ChannelStatus = { connected: boolean; error?: string };
@@ -56,7 +57,7 @@ export default function InboxTab({ state, channels }: { state: AppState; channel
       )}
       <ul className="space-y-2 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
         {messages.map((m) => (
-          <MessageCard key={m.id} message={m} />
+          <MessageCard key={m.id} state={state} message={m} />
         ))}
       </ul>
 
@@ -95,7 +96,7 @@ const RESOLUTION_LABEL: Record<Resolution, string> = {
   settled: "Settled",
 };
 
-function MessageCard({ message }: { message: Message }) {
+function MessageCard({ state, message }: { state: AppState; message: Message }) {
   const [big, setBig] = useState(false);
   return (
     <li className="rounded-xl bg-white p-3 shadow-sm">
@@ -131,17 +132,7 @@ function MessageCard({ message }: { message: Message }) {
           {message.aiMs !== undefined && ` · ${(message.aiMs / 1000).toFixed(1)} s`}
         </p>
       )}
-      <select
-        value={isSettled(message) ? "settled" : "open"}
-        onChange={(e) => updateState((s) => setSettled(s, message.id, e.target.value === "settled"))}
-        aria-label="Settled or not"
-        className={`mt-2 rounded-lg border px-2 py-1 text-xs font-medium ${
-          isSettled(message) ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"
-        }`}
-      >
-        <option value="open">Not settled</option>
-        <option value="settled">Settled</option>
-      </select>
+      <SettleMenu state={state} message={message} />
       <ul className="mt-1.5 space-y-1">
         {message.outcomes.map((o) => (
           <li key={o.id} className="text-xs">
@@ -154,5 +145,41 @@ function MessageCard({ message }: { message: Message }) {
         ))}
       </ul>
     </li>
+  );
+}
+
+// Settled / Not settled. A message still waiting on a change offers the same options as Home,
+// so settling it also says whether the change (e.g. 2 extra breakfasts today) is made.
+function SettleMenu({ state, message }: { state: AppState; message: Message }) {
+  const settled = isSettled(message);
+  const open = message.outcomes.filter((o) => o.status === "attention" && !o.resolution);
+  const choices: Choice[] = settled
+    ? [{ value: "settled", label: "Settled" }]
+    : open.length > 1
+      ? [{ value: "settled", label: "Settled – no changes (decide each one on Home)" }]
+      : choicesFor(state, message, open[0], nowOf()).filter((c) => c.value !== "add_customer");
+
+  function pick(value: string) {
+    if (value === "open") return updateState((s) => setSettled(s, message.id, false));
+    if (value === "settled" || open.length !== 1) return updateState((s) => setSettled(s, message.id, true));
+    updateState((s) => resolveOutcome(s, message.id, open[0].id, value as Resolution));
+  }
+
+  return (
+    <select
+      value={settled ? "settled" : "open"}
+      onChange={(e) => pick(e.target.value)}
+      aria-label="Settled or not"
+      className={`mt-2 max-w-full rounded-lg border px-2 py-1 text-xs font-medium ${
+        settled ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"
+      }`}
+    >
+      <option value="open">Not settled</option>
+      {choices.map((c) => (
+        <option key={c.value} value={c.value}>
+          {c.label}
+        </option>
+      ))}
+    </select>
   );
 }

@@ -125,7 +125,7 @@ export function applyMessage(state: AppState, incoming: IncomingMessage, underst
         outcome({
           status: "attention",
           summary: `${r.kind === "renewal" ? "Renew" : "Start"} ${planId ? PLANS[planId].label : "a plan"}${startDate ? ` from ${formatDay(startDate)}` : ""}`,
-          reason: planId && startDate ? "Check the plan and start date, then accept to add it." : "The plan or start date isn't clear. Reply to confirm.",
+          reason: planId && startDate ? "Check the plan and start date before starting it." : "The plan or start date isn't clear. Reply to confirm.",
           action: planId && startDate ? { type: "add_subscription", subscription: { id: newId("s"), customerId: c.id, planId, startDate } } : undefined,
         });
         return s;
@@ -214,7 +214,7 @@ export function applyMessage(state: AppState, incoming: IncomingMessage, underst
     outcome({
       status: "attention",
       summary: `Resume ${late.map((m) => `${MEAL_LABELS[m.meal].toLowerCase()} ${formatDay(m.date)}`).join(", ")}`,
-      reason: `Sent at ${formatTime(at)}, after the cutoff. Accept only if you can still cook it.`,
+      reason: `Sent at ${formatTime(at)}, after the cutoff. Resume it only if you can still cook it.`,
       action: { type: "add_facts", mealChanges: late.map((m) => ({ ...m, allowedLate: true })) },
     });
     return { ...s, mealChanges: [...s.mealChanges, ...onTime] };
@@ -239,19 +239,24 @@ export function applyMessage(state: AppState, incoming: IncomingMessage, underst
       })),
     );
     const summary = `Order ${r.quantity} × ${mealList(r.meals)} · ${dayRange(from, to)}`;
-    const late = orders.filter((o) => !isOnTime(o.meal, o.date, at));
-
-    if (unsure || late.length > 0) {
-      outcome({
-        status: "attention",
-        summary,
-        reason: unsure ? unclearReason || "The AI wasn't sure about this." : `Sent at ${formatTime(at)}, after the cutoff. Accept only if you can still cook it.`,
-        action: { type: "add_facts", singleOrders: orders },
-      });
+    if (unsure) {
+      outcome({ status: "attention", summary, reason: unclearReason || "The AI wasn't sure about this.", action: { type: "add_facts", singleOrders: orders } });
       return s;
     }
-    outcome({ status: "applied", summary });
-    return { ...s, singleOrders: [...s.singleOrders, ...orders] };
+
+    // Meals still before their cutoff are added now; only the late ones wait for the owner.
+    const onTime = orders.filter((o) => isOnTime(o.meal, o.date, at));
+    const late = orders.filter((o) => !isOnTime(o.meal, o.date, at));
+    if (onTime.length > 0) outcome({ status: "applied", summary: late.length > 0 ? `${summary} (on-time part)` : summary });
+    if (late.length > 0) {
+      outcome({
+        status: "attention",
+        summary: `Order ${r.quantity} × ${late.map((o) => `${MEAL_LABELS[o.meal].toLowerCase()} ${formatDay(o.date)}`).join(", ")}`,
+        reason: `Sent at ${formatTime(at)}, after the cutoff. Add it only if you can still cook it.`,
+        action: { type: "add_facts", singleOrders: late },
+      });
+    }
+    return { ...s, singleOrders: [...s.singleOrders, ...onTime] };
   }
 
   function applyOrderChange(s: AppState, r: AiRequest, c: Customer, from: string, to: string): AppState {

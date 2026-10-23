@@ -144,6 +144,34 @@ describe("applyMessage", () => {
     expect(accepted.singleOrders).toHaveLength(base.singleOrders.length + 1);
   });
 
+  it("adds the on-time days of an order now and asks only about the late ones", () => {
+    // 7 am: today's breakfast closed at 10 pm last night, tomorrow's is still open.
+    const { state, message } = send(
+      base,
+      singleCustomer.phone,
+      at(7, 0),
+      understood([req({ kind: "single_order", meals: ["breakfast"], quantity: 2, start_date: today, end_date: tomorrow })]),
+    );
+    expect(message.outcomes.map((o) => o.status)).toEqual(["applied", "attention"]);
+    const late = message.outcomes[1];
+    expect(late.action).toMatchObject({ type: "add_facts", singleOrders: [{ date: today, meal: "breakfast", quantity: 2 }] });
+    expect(mealsOn(state, tomorrow).breakfast.total).toBe(mealsOn(base, tomorrow).breakfast.total + 2);
+    expect(mealsOn(state, today).breakfast.total).toBe(mealsOn(base, today).breakfast.total);
+
+    // "Add 2 breakfasts today – settled" puts them into today's count.
+    const added = resolveOutcome(state, message.id, late.id, "approved");
+    expect(mealsOn(added, today).breakfast.total).toBe(mealsOn(base, today).breakfast.total + 2);
+  });
+
+  it("checks each meal against its own cutoff", () => {
+    const order = (h: number, m: number, meal: "lunch" | "dinner") =>
+      send(base, singleCustomer.phone, at(h, m), understood([req({ kind: "single_order", meals: [meal], quantity: 1, start_date: today })])).message.outcomes[0].status;
+    expect(order(9, 59, "lunch")).toBe("applied");
+    expect(order(10, 1, "lunch")).toBe("attention");
+    expect(order(16, 59, "dinner")).toBe("applied");
+    expect(order(17, 1, "dinner")).toBe("attention");
+  });
+
   it("changes the quantity of an existing order", () => {
     const order = base.singleOrders.find((o) => o.customerId === singleCustomer.id && o.date === today)!;
     const { state, message } = send(
