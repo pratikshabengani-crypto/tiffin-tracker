@@ -3,7 +3,7 @@ import { formatINR, MEAL_LABELS } from "./format";
 import { BUSINESS_NAME } from "./reminders";
 import { summarizeAll } from "./rules/counts";
 import { khataFor } from "./rules/khata";
-import { isDuplicateUtr } from "./rules/paymentStatus";
+import { isDuplicateUtr, isWrongRecipient } from "./rules/paymentStatus";
 import { skipStateFor, type SubscriptionSummary } from "./rules/subscriptions";
 import { addDays, dateRange, formatDay, formatTime, istDate, isOnTime } from "./rules/time";
 import type { AppState, Message, Outcome } from "./state";
@@ -344,7 +344,7 @@ export function applyMessage(state: AppState, incoming: IncomingMessage, underst
       problems.push(unsure && unclearReason ? `${unclearReason} Check your UPI app for the amount.` : "The amount isn't shown. Check your UPI app for it.");
     }
     if (hasScreenshot && r.screenshot_status !== "success") problems.push(`The screenshot shows the payment as ${r.screenshot_status}.`);
-    if (hasScreenshot && r.paid_to && !r.paid_to.toLowerCase().includes(BUSINESS_NAME.split(" ")[0].toLowerCase())) {
+    if (hasScreenshot && isWrongRecipient(r.paid_to)) {
       problems.push(`It says it was paid to "${r.paid_to}", not ${BUSINESS_NAME}.`);
     }
     if (isDuplicateUtr(payment, s.payments)) problems.push("This transaction ID was already used for another payment.");

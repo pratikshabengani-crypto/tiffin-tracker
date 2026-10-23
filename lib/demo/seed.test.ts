@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveOutcome } from "../actions";
 import { changesOn, mealsOn } from "../rules/counts";
-import { paymentRows } from "../rules/paymentStatus";
+import { isDuplicateUtr, isWrongRecipient, paymentRows } from "../rules/paymentStatus";
 import { needsAttention } from "../state";
 import { TEST_DAY, demoState } from "./seed";
 
@@ -43,5 +43,16 @@ describe("demo data", () => {
     const after = resolveOutcome(state, late.message.id, late.outcome!.id, "approved");
     expect(mealsOn(after, TEST_DAY).breakfast.total).toBe(before - 1);
     expect(needsAttention(after)).toHaveLength(1);
+  });
+});
+
+describe("sample payment screenshots", () => {
+  it("includes screenshots to check, with problems to catch", () => {
+    const state = demoState(TEST_DAY);
+    const shots = state.payments.filter((p) => p.status === "pending" && p.evidence === "screenshot");
+    expect(shots.length).toBeGreaterThanOrEqual(6);
+    expect(shots.every((p) => p.screenshot?.startsWith("data:image/svg+xml"))).toBe(true);
+    expect(shots.some((p) => isWrongRecipient(p.paidTo))).toBe(true);
+    expect(shots.filter((p) => isDuplicateUtr(p, state.payments)).length).toBeGreaterThanOrEqual(2);
   });
 });

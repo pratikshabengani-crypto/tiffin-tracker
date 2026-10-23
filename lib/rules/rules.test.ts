@@ -3,7 +3,7 @@ import type { Facts, Meal, MealChange, Payment, PlanId, SingleOrder } from "../t
 import { changesOn, mealsOn } from "./counts";
 import { khataFor } from "./khata";
 import { canChangePrice, cancelledOnTime, isCharged, isCooked, priceFor } from "./orders";
-import { isDuplicateUtr, paymentRows } from "./paymentStatus";
+import { isDuplicateUtr, isWrongRecipient, paymentRows } from "./paymentStatus";
 import { mealTrack, nextAway, servesOn, summarizeSubscription } from "./subscriptions";
 import {
   addDays,
@@ -346,5 +346,14 @@ describe("payment status", () => {
     const again = payment("anand", 360, { utr: "412388901265", status: "pending" });
     expect(isDuplicateUtr(again, [first, again])).toBe(true);
     expect(isDuplicateUtr(again, [{ ...first, status: "rejected" }, again])).toBe(false);
+  });
+});
+
+describe("isWrongRecipient", () => {
+  it("flags a payment to someone other than the business", () => {
+    expect(isWrongRecipient("Annapoorna Tiffins")).toBe(false);
+    expect(isWrongRecipient("ANNAPOORNA TIFFINS")).toBe(false);
+    expect(isWrongRecipient("Ravi Kumar")).toBe(true);
+    expect(isWrongRecipient(null)).toBe(false);
   });
 });

@@ -182,6 +182,29 @@ export function demoState(today: string = istDate(new Date())): AppState {
     });
   }
 
+  // More plan advances sent as screenshots: one that matches, one ₹300 short,
+  // one paid to someone else, and one reusing another payment’s transaction ID.
+  const unpaid = subscribers.filter((s) => s !== renewing && !payments.some((p) => p.subscriptionId === s.sub.id));
+  const advance = (s: (typeof subscribers)[number], amount: number, utr: string, sentAt: string, paidTo = "Annapoorna Tiffins") =>
+    payments.push({
+      id: nextId("p"),
+      customerId: s.customer.id,
+      purpose: "subscription",
+      subscriptionId: s.sub.id,
+      amount,
+      method: "upi",
+      evidence: "screenshot",
+      screenshot: sampleScreenshot(amount, utr, receiptTime(sentAt), paidTo),
+      utr,
+      paidTo,
+      status: "pending",
+      claimedAt: sentAt,
+    });
+  if (unpaid[0]) advance(unpaid[0], PLANS[unpaid[0].sub.planId].price, "6021 8834 2209", at(today, 8, 15));
+  if (unpaid[1]) advance(unpaid[1], PLANS[unpaid[1].sub.planId].price - 300, "6021 9017 3346", at(addDays(today, -1), 18, 40));
+  if (unpaid[2]) advance(unpaid[2], PLANS[unpaid[2].sub.planId].price, "6021 6650 7781", at(today, 8, 30), "Ravi Kumar");
+  if (unpaid[3]) advance(unpaid[3], PLANS[unpaid[3].sub.planId].price, "6021 4471 9935", at(today, 9, 5));
+
   // ---- single-meal customers -------------------------------------------------
   const singles = Array.from({ length: 12 }, newCustomer);
   customers.push(...singles);

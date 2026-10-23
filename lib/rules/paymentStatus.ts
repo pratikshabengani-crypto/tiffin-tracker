@@ -1,3 +1,4 @@
+import { BUSINESS_NAME } from "../reminders";
 import type { Customer, Facts, Payment } from "../types";
 import { summarizeAll } from "./counts";
 import { khataFor, type Khata } from "./khata";
@@ -82,6 +83,11 @@ export function isDuplicateUtr(payment: Payment, payments: Payment[]): boolean {
   const utr = normalizeUtr(payment.utr);
   if (!utr) return false;
   return payments.some((p) => p.id !== payment.id && p.status !== "rejected" && normalizeUtr(p.utr) === utr);
+}
+
+// The screenshot names someone other than the business as who was paid.
+export function isWrongRecipient(paidTo: string | null | undefined): boolean {
+  return !!paidTo && !paidTo.toLowerCase().includes(BUSINESS_NAME.split(" ")[0].toLowerCase());
 }
 
 function normalizeUtr(utr: string | null | undefined): string {

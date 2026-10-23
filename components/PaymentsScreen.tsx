@@ -4,8 +4,8 @@ import { useState } from "react";
 import { decidePayment, recordPayment } from "@/lib/actions";
 import { isTelegram } from "@/lib/contact";
 import { formatINR, MEAL_LABELS } from "@/lib/format";
-import { reminderText, screenshotRequestText, whatsappLink } from "@/lib/reminders";
-import { isDuplicateUtr, paymentRows, type PaymentRow, type PayStatus } from "@/lib/rules/paymentStatus";
+import { BUSINESS_NAME, reminderText, screenshotRequestText, whatsappLink } from "@/lib/reminders";
+import { isDuplicateUtr, isWrongRecipient, paymentRows, type PaymentRow, type PayStatus } from "@/lib/rules/paymentStatus";
 import { formatDay, formatTime, istDate } from "@/lib/rules/time";
 import { nowOf, type AppState } from "@/lib/state";
 import { updateState } from "@/lib/store";
@@ -214,6 +214,9 @@ function PendingPayment({
           {payment.utr && <div>Transaction ID {payment.utr}</div>}
           {payment.paidTo && <div>Paid to {payment.paidTo}</div>}
           {duplicate && <div className="mt-0.5 font-semibold text-red-700">⚠ This transaction ID was already used for another payment</div>}
+          {isWrongRecipient(payment.paidTo) && (
+            <div className="mt-0.5 font-semibold text-red-700">⚠ Paid to {payment.paidTo}, not {BUSINESS_NAME}</div>
+          )}
           {amountDiffers && <div className="mt-0.5 text-amber-800">Amount differs from what&apos;s due ({formatINR(expectedAmount)})</div>}
         </div>
       </div>
