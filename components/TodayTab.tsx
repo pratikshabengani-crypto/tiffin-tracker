@@ -7,7 +7,8 @@ import { formatINR, MEAL_LABELS } from "@/lib/format";
 import { changesOn, mealsOn, summarizeAll, type DayChange } from "@/lib/rules/counts";
 import { canChangePrice, priceFor } from "@/lib/rules/orders";
 import { paymentRows } from "@/lib/rules/paymentStatus";
-import { addDays, cutoffStatus, formatDay, formatTime, istDate, istHour } from "@/lib/rules/time";
+import type { SubscriptionSummary } from "@/lib/rules/subscriptions";
+import { addDays, cutoffFor, cutoffStatus, formatDay, formatTime, istDate, istHour } from "@/lib/rules/time";
 import { needsAttention, nowOf, type AppState, type Message, type Outcome, type Resolution } from "@/lib/state";
 import { updateState } from "@/lib/store";
 import { MEALS, PLANS, STANDARD_PRICES, type Meal, type PlanId } from "@/lib/types";
@@ -36,9 +37,12 @@ const MEAL_STYLE: Record<Meal, { border: string; badge: string; icon: string }> 
 export default function TodayTab({ state, onOpenPayments }: Props) {
   const now = nowOf();
   const today = istDate(now);
+  const [day, setDay] = useState(today); // the day the meal counts are for; the arrows move it
+  const date = day < today ? today : day;
+  const isToday = date === today;
   const summaries = useMemo(() => summarizeAll(state), [state]);
-  const counts = mealsOn(state, today, summaries);
-  const changes = changesOn(state, today, summaries);
+  const counts = mealsOn(state, date, summaries);
+  const changes = changesOn(state, date, summaries);
   const attention = needsAttention(state);
   const rows = paymentRows(state, today, summaries);
 
@@ -51,14 +55,19 @@ export default function TodayTab({ state, onOpenPayments }: Props) {
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900">{greeting}</h1>
         <p className="text-sm text-zinc-500">
           {formatDay(today)} · {formatTime(now)}
-          <span className="ml-2 inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-600" aria-hidden="true" />
-            live
-          </span>
         </p>
       </div>
 
-      <section aria-label="Meals to cook today" className="grid grid-cols-3 gap-2 lg:gap-4">
+      <div className="flex items-center justify-between rounded-xl bg-white px-2 py-1.5 shadow-sm">
+        <DayButton label="Previous day" disabled={isToday} onClick={() => setDay(addDays(date, -1))}>‹</DayButton>
+        <div className="text-center">
+          <div className="text-sm font-semibold text-zinc-900">{dayName(date, today)}&apos;s meals</div>
+          <div className="text-xs text-zinc-500">{formatDay(date)}</div>
+        </div>
+        <DayButton label="Next day" onClick={() => setDay(addDays(date, 1))}>›</DayButton>
+      </div>
+
+      <section aria-label={`Meals to send on ${formatDay(date)}`} className="grid grid-cols-3 gap-2 lg:gap-4">
         {MEALS.map((meal) => (
           <div key={meal} className={`rounded-xl border-t-4 bg-white p-3 shadow-sm lg:p-5 ${MEAL_STYLE[meal].border}`}>
             <div className="flex items-center justify-between text-xs font-medium text-zinc-600">
@@ -73,7 +82,7 @@ export default function TodayTab({ state, onOpenPayments }: Props) {
             <div className="text-[11px] leading-tight text-zinc-500">
               {counts[meal].subscribers} plan{counts[meal].single > 0 && ` + ${counts[meal].single} single`}
             </div>
-            <CutoffLine meal={meal} today={today} now={now} />
+            {isToday ? <CutoffLine meal={meal} today={today} now={now} /> : <FinalLine meal={meal} date={date} today={today} now={now} />}
           </div>
         ))}
       </section>
@@ -94,7 +103,8 @@ export default function TodayTab({ state, onOpenPayments }: Props) {
             </div>
           )}
           <div className="order-3 lg:order-none">
-            <ChangesCard changes={changes} />
+            <ChangesCard changes={changes} title={`Changes ${isToday ? "today" : dayName(date, today) === "Tomorrow" ? "tomorrow" : `on ${formatDay(date)}`}`} />
+            {!isToday && <PlansCard state={state} summaries={summaries} date={date} />}
           </div>
         </div>
         <div className="contents lg:flex lg:flex-col lg:gap-5">
@@ -122,6 +132,71 @@ function CutoffLine({ meal, today, now }: { meal: Meal; today: string; now: stri
       <span className="font-semibold text-zinc-800">🔒 Locked</span>
       <span className="block">next: till {formatTime(status.nextUntil)} {nextDay}</span>
     </div>
+  );
+}
+
+// Whether a meal's number can still change, and until when.
+function FinalLine({ meal, date, today, now }: { meal: Meal; date: string; today: string; now: string }) {
+  const until = cutoffFor(meal, date);
+  if (new Date(now).getTime() > until.getTime()) {
+    return <div className="mt-2 rounded-md bg-zinc-100 px-1.5 py-1 text-[10px] font-semibold leading-tight text-zinc-700">🔒 Final</div>;
+  }
+  const day = istDate(until);
+  const when = day === today ? (meal === "breakfast" ? "tonight" : "today") : day === addDays(today, 1) ? "tomorrow" : formatDay(day);
+  return (
+    <div className="mt-2 rounded-md bg-amber-50 px-1.5 py-1 text-[10px] leading-tight text-amber-800">
+      <span className="font-semibold">Can change</span>
+      <span className="block">till {formatTime(until)} {when}</span>
+    </div>
+  );
+}
+
+function DayButton({ label, disabled, onClick, children }: { label: string; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="h-10 w-10 rounded-lg text-2xl text-zinc-600 hover:bg-zinc-100 disabled:opacity-30"
+    >
+      {children}
+    </button>
+  );
+}
+
+// "Today", "Tomorrow", or the weekday.
+function dayName(date: string, today: string): string {
+  if (date === today) return "Today";
+  if (date === addDays(today, 1)) return "Tomorrow";
+  return formatDay(date).split(",")[0];
+}
+
+// Who starts or finishes a monthly plan on a coming day.
+function PlansCard({ state, summaries, date }: { state: AppState; summaries: SubscriptionSummary[]; date: string }) {
+  const customers = new Map(state.customers.map((c) => [c.id, c]));
+  const starting = summaries.filter((s) => s.sub.startDate === date);
+  const ending = summaries.filter((s) => s.endDate === date);
+  return (
+    <Card title="Plans starting or ending">
+      {starting.length === 0 && ending.length === 0 && <p className="text-sm text-zinc-500">No plans start or end this day.</p>}
+      <ul className="space-y-1 text-sm">
+        {starting.map((s) => (
+          <li key={`start-${s.sub.id}`} className="flex items-center gap-2">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" aria-hidden="true" />
+            <span className="font-medium text-zinc-800">{customers.get(s.sub.customerId)?.name}</span>
+            <span className="text-zinc-500">starts {PLANS[s.sub.planId].label}</span>
+          </li>
+        ))}
+        {ending.map((s) => (
+          <li key={`end-${s.sub.id}`} className="flex items-center gap-2">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
+            <span className="font-medium text-zinc-800">{customers.get(s.sub.customerId)?.name}</span>
+            <span className="text-zinc-500">last day of {PLANS[s.sub.planId].label}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 
@@ -298,11 +373,11 @@ const CHANGE_TEXT: Record<DayChange["kind"], { label: (c: DayChange) => string; 
   late_cancel: { label: () => "cancelled late (still cooked)", dot: "bg-orange-400" },
 };
 
-function ChangesCard({ changes }: { changes: DayChange[] }) {
+function ChangesCard({ changes, title = "Changes today" }: { changes: DayChange[]; title?: string }) {
   const [showAll, setShowAll] = useState<Partial<Record<Meal, boolean>>>({});
 
   return (
-    <Card title={`Changes today (${changes.length})`}>
+    <Card title={`${title} (${changes.length})`}>
       {changes.length === 0 && <p className="text-sm text-zinc-500">A normal day. No skips or extra orders.</p>}
       <div className="space-y-3">
         {MEALS.map((meal) => {

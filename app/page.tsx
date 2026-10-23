@@ -13,7 +13,7 @@ import { getState, subscribe } from "@/lib/store";
 type Tab = "today" | "monthly" | "single" | "inbox";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: "today", label: "Today", icon: "M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4M12 8a4 4 0 100 8 4 4 0 000-8z" },
+  { id: "today", label: "Home", icon: "M4 11l8-7 8 7M6 9.5V20h12V9.5M10 20v-5h4v5" },
   { id: "monthly", label: "Monthly", icon: "M5 5h14v15H5zM5 9h14M9 3v4M15 3v4" },
   { id: "single", label: "Single", icon: "M6 4h12v16l-3-2-3 2-3-2-3 2zM9 9h6M9 13h6" },
   { id: "inbox", label: "Inbox", icon: "M5 5h14a1 1 0 011 1v9a1 1 0 01-1 1H10l-5 4v-4a1 1 0 01-1-1V6a1 1 0 011-1zM8 9.5h8M8 12.5h5" },
@@ -54,10 +54,10 @@ function Dashboard() {
   const state = useSyncExternalStore(subscribe, getState, getState);
   const [tab, setTab] = useState<Tab>("today");
 
-  // Redraw every 30 s so the clock, counts and "Locked" cutoffs follow the real time.
+  // Redraw every 10 s so the clock, counts and "Locked" cutoffs follow the real time.
   const [, setTick] = useState(0);
   useEffect(() => {
-    const timer = setInterval(() => setTick((t) => t + 1), 30_000);
+    const timer = setInterval(() => setTick((t) => t + 1), 10_000);
     return () => clearInterval(timer);
   }, []);
 
