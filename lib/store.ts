@@ -1,5 +1,4 @@
 import { demoState } from "./demo/seed";
-import { istDate } from "./rules/time";
 import type { AppState } from "./state";
 
 // The whole app state lives in this browser's localStorage. React reads it through
@@ -33,8 +32,9 @@ export function getState(): AppState {
     cachedRaw = raw;
     cached = parse(raw);
   }
-  // The sample data is built around one day; on a new day, rebuild it so "today" stays current.
-  if (!cached || cached.seededFor !== istDate(new Date())) save(demoState());
+  // Sample data is only created the first time. After that, everything the owner changes
+  // (payments marked paid, settled messages…) is kept until she presses "Reset demo data".
+  if (!cached) save(demoState());
   return cached!;
 }
 

@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Tiffin Tracker",
+  title: "Khana Khata",
   description: "Track tiffin orders, payments and dues from WhatsApp messages",
 };
 

@@ -39,8 +39,8 @@ describe("demo data", () => {
 
   it("allowing the late breakfast skip lowers today's breakfast count", () => {
     const before = mealsOn(state, TEST_DAY).breakfast.total;
-    const late = needsAttention(state).find((a) => a.outcome.action?.type === "allow_late_skip")!;
-    const after = resolveOutcome(state, late.message.id, late.outcome.id, "approved");
+    const late = needsAttention(state).find((a) => a.outcome?.action?.type === "allow_late_skip")!;
+    const after = resolveOutcome(state, late.message.id, late.outcome!.id, "approved");
     expect(mealsOn(after, TEST_DAY).breakfast.total).toBe(before - 1);
     expect(needsAttention(after)).toHaveLength(1);
   });

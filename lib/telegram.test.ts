@@ -38,7 +38,7 @@ describe("Telegram", () => {
       summary: "hello",
     });
     const unknown = needsAttention(first).find((a) => a.message.id === "m1")!;
-    const added = addCustomerFromMessage(first, "m1", unknown.outcome.id, "Farhan K", "lunch_dinner", TEST_DAY);
+    const added = addCustomerFromMessage(first, "m1", unknown.outcome!.id, "Farhan K", "lunch_dinner", TEST_DAY);
     expect(findCustomer(added, "tg:5551234")?.name).toBe("Farhan K");
   });
 });

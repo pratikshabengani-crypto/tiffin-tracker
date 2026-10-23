@@ -1,4 +1,4 @@
-# Tiffin Tracker
+# Khana Khata
 
 A phone dashboard for a small home tiffin (meal) business in Bengaluru. Customers send WhatsApp messages like *"kal lunch nahi chahiye"* or a payment screenshot; an AI reads each one and the dashboard updates itself: meals to cook today, monthly subscribers' calendars, single-meal orders and who still owes money. The owner only handles the few things that need a human.
 

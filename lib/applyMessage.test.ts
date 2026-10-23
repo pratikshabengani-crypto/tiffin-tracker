@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { resolveOutcome } from "./actions";
+import { resolveOutcome, setSettled } from "./actions";
 import { applyMessage, senderContext, type IncomingMessage } from "./applyMessage";
 import { TEST_DAY, demoState } from "./demo/seed";
 import { mealsOn, summarizeAll } from "./rules/counts";
 import { khataFor } from "./rules/khata";
 import { addDays, istInstant } from "./rules/time";
-import type { AppState } from "./state";
+import { isSettled, needsAttention, type AppState } from "./state";
 import { PLANS, type PlanId } from "./types";
 import type { AiRequest, Understanding } from "./understandSchema";
 
@@ -74,6 +74,23 @@ describe("applyMessage", () => {
 
     const allowed = resolveOutcome(state, message.id, late.id, "approved");
     expect(mealsOn(allowed, today).lunch.total).toBe(mealsOn(base, today).lunch.total - 1);
+  });
+
+  it("marks a message settled or not settled without changing any orders", () => {
+    const priya = subscriber("lunch");
+    const { state, message } = send(base, priya.phone, at(10, 12), understood([req({ kind: "skip", meals: ["lunch"], start_date: today })]));
+    const find = (s: AppState) => s.messages.find((m) => m.id === message.id)!;
+    expect(isSettled(find(state))).toBe(false);
+
+    const settled = setSettled(state, message.id, true);
+    expect(isSettled(find(settled))).toBe(true);
+    expect(find(settled).outcomes[0].resolution).toBe("settled");
+    expect(settled.mealChanges).toEqual(state.mealChanges);
+    expect(needsAttention(settled).some((a) => a.message.id === message.id)).toBe(false);
+
+    const reopened = setSettled(settled, message.id, false);
+    expect(isSettled(find(reopened))).toBe(false);
+    expect(needsAttention(reopened).filter((a) => a.message.id === message.id)).toEqual([{ message: find(reopened) }]);
   });
 
   it("skips every meal in a date range", () => {

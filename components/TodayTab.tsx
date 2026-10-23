@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { contactLabel } from "@/lib/contact";
-import { addCustomerFromMessage, resolveOutcome, setPrice } from "@/lib/actions";
+import { addCustomerFromMessage, resolveOutcome, setPrice, setSettled } from "@/lib/actions";
 import { formatINR, MEAL_LABELS } from "@/lib/format";
 import { changesOn, mealsOn, summarizeAll, type DayChange } from "@/lib/rules/counts";
 import { canChangePrice, priceFor } from "@/lib/rules/orders";
 import { paymentRows } from "@/lib/rules/paymentStatus";
 import { addDays, cutoffStatus, formatDay, formatTime, istDate, istHour } from "@/lib/rules/time";
-import { needsAttention, nowOf, type AppState, type Message, type Outcome } from "@/lib/state";
+import { needsAttention, nowOf, type AppState, type Message, type Outcome, type Resolution } from "@/lib/state";
 import { updateState } from "@/lib/store";
 import { MEALS, PLANS, STANDARD_PRICES, type Meal, type PlanId } from "@/lib/types";
 
@@ -87,7 +87,7 @@ export default function TodayTab({ state, onOpenPayments }: Props) {
               <Card title={`Needs your attention (${attention.length})`} tone="amber">
                 <ul className="divide-y divide-amber-100">
                   {attention.map(({ message, outcome }) => (
-                    <AttentionItem key={outcome.id} message={message} outcome={outcome} />
+                    <AttentionItem key={outcome?.id ?? message.id} message={message} outcome={outcome} />
                   ))}
                 </ul>
               </Card>
@@ -134,9 +134,33 @@ function Card({ title, tone, children }: { title: string; tone?: "amber"; childr
   );
 }
 
-function AttentionItem({ message, outcome }: { message: Message; outcome: Outcome }) {
-  const resolve = (resolution: "approved" | "dismissed") =>
-    updateState((s) => resolveOutcome(s, message.id, outcome.id, resolution));
+type Choice = Resolution | "add_customer";
+
+// The options in an item's "Choose what to do" menu.
+function choicesFor(message: Message, outcome?: Outcome): { value: Choice; label: string }[] {
+  const type = outcome?.action?.type;
+  const choices: { value: Choice; label: string }[] =
+    type === "allow_late_skip"
+      ? [{ value: "approved", label: "Allow skip" }, { value: "dismissed", label: "Keep the meal" }]
+      : type === "allow_late_cancel"
+        ? [{ value: "approved", label: "Don't charge" }, { value: "dismissed", label: "Charge anyway" }]
+        : outcome?.action
+          ? [{ value: "approved", label: "Accept" }, { value: "dismissed", label: "Decline" }]
+          : [];
+  if (!message.senderName) choices.push({ value: "add_customer", label: "Add as customer" });
+  choices.push({ value: "settled", label: "Settled" });
+  return choices;
+}
+
+function AttentionItem({ message, outcome }: { message: Message; outcome?: Outcome }) {
+  const [choice, setChoice] = useState<Choice | "">("");
+  const [adding, setAdding] = useState(false);
+
+  const done = () => {
+    if (choice === "add_customer") setAdding(true);
+    else if (choice === "settled" && !outcome) updateState((s) => setSettled(s, message.id, true));
+    else if (choice && outcome) updateState((s) => resolveOutcome(s, message.id, outcome.id, choice));
+  };
 
   return (
     <li className="py-3 first:pt-0 last:pb-0 text-sm">
@@ -145,52 +169,44 @@ function AttentionItem({ message, outcome }: { message: Message; outcome: Outcom
         <span className="shrink-0 text-xs text-zinc-500">{formatTime(message.receivedAt)}</span>
       </div>
       <p className="mt-0.5 italic text-zinc-600">“{message.text}”</p>
-      <p className="mt-1 text-zinc-800">{outcome.summary}</p>
-      {outcome.reason && <p className="text-xs text-amber-800">{outcome.reason}</p>}
-      <div className="mt-2 flex flex-wrap gap-2">
-        {outcome.action?.type === "allow_late_skip" ? (
-          <>
-            <Button primary onClick={() => resolve("approved")}>Allow skip</Button>
-            <Button onClick={() => resolve("dismissed")}>Keep the meal</Button>
-          </>
-        ) : outcome.action?.type === "allow_late_cancel" ? (
-          <>
-            <Button primary onClick={() => resolve("approved")}>Don&apos;t charge</Button>
-            <Button onClick={() => resolve("dismissed")}>Charge anyway</Button>
-          </>
-        ) : outcome.action ? (
-          <>
-            <Button primary onClick={() => resolve("approved")}>Accept</Button>
-            <Button onClick={() => resolve("dismissed")}>Decline</Button>
-          </>
-        ) : !message.senderName ? (
-          <AddCustomer message={message} outcome={outcome} onHandled={() => resolve("dismissed")} />
+      <p className="mt-1 text-zinc-800">{outcome?.summary ?? message.summary}</p>
+      <p className="text-xs text-amber-800">{outcome ? outcome.reason : "You marked this as not settled."}</p>
+      <div className="mt-2 flex gap-2">
+        {adding ? (
+          <AddCustomer message={message} outcome={outcome} onCancel={() => setAdding(false)} />
         ) : (
-          <Button onClick={() => resolve("dismissed")}>Mark as handled</Button>
+          <>
+            <select
+              value={choice}
+              onChange={(e) => setChoice(e.target.value as Choice)}
+              aria-label="What to do with this message"
+              className="min-h-9 min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-800"
+            >
+              <option value="" disabled>
+                Choose what to do…
+              </option>
+              {choicesFor(message, outcome).map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <Button primary disabled={!choice} onClick={done}>Done</Button>
+          </>
         )}
       </div>
     </li>
   );
 }
 
-// Turn an unknown WhatsApp number into a customer (optionally on a monthly plan from today).
-function AddCustomer({ message, outcome, onHandled }: { message: Message; outcome: Outcome; onHandled: () => void }) {
-  const [open, setOpen] = useState(false);
+// Turn an unknown number into a customer (optionally on a monthly plan from today).
+function AddCustomer({ message, outcome, onCancel }: { message: Message; outcome?: Outcome; onCancel: () => void }) {
   const [name, setName] = useState(message.profileName ?? "");
   const [plan, setPlan] = useState<PlanId | "">("");
 
-  if (!open) {
-    return (
-      <>
-        <Button primary onClick={() => setOpen(true)}>Add as customer</Button>
-        <Button onClick={onHandled}>Mark as handled</Button>
-      </>
-    );
-  }
-
   const save = () => {
     if (!name.trim()) return;
-    updateState((s) => addCustomerFromMessage(s, message.id, outcome.id, name, plan || null, istDate(nowOf())));
+    updateState((s) => addCustomerFromMessage(s, message.id, outcome?.id ?? "", name, plan || null, istDate(nowOf())));
   };
   const input = "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm";
   return (
@@ -213,18 +229,29 @@ function AddCustomer({ message, outcome, onHandled }: { message: Message; outcom
       <p className="text-[11px] text-zinc-500">{contactLabel(message.phone)}. Their next messages will be recognised.</p>
       <div className="flex gap-2">
         <Button primary onClick={save}>Save customer</Button>
-        <Button onClick={() => setOpen(false)}>Cancel</Button>
+        <Button onClick={onCancel}>Cancel</Button>
       </div>
     </div>
   );
 }
 
-function Button({ primary, onClick, children }: { primary?: boolean; onClick: () => void; children: React.ReactNode }) {
+function Button({
+  primary,
+  disabled,
+  onClick,
+  children,
+}: {
+  primary?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-9 rounded-lg px-3 text-sm font-medium ${
+      disabled={disabled}
+      className={`min-h-9 shrink-0 rounded-lg px-3 text-sm font-medium disabled:opacity-40 ${
         primary ? "bg-emerald-700 text-white hover:bg-emerald-800" : "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
       }`}
     >

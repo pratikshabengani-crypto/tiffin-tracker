@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { addCustomer, addOrder, cancelOrder, setNotDelivered } from "@/lib/actions";
+import { normalizePhone } from "@/lib/contact";
 import { formatINR, MEAL_LABELS } from "@/lib/format";
 import { khataFor, type Charge } from "@/lib/rules/khata";
 import { cancelledOnTime, priceFor } from "@/lib/rules/orders";
@@ -17,7 +18,8 @@ export default function SingleTab({ state, onOpenPayments }: Props) {
   const now = nowOf();
   const today = istDate(now);
   const [date, setDate] = useState(today);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<"order" | "customer" | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
 
   const orders = state.singleOrders.filter((o) => o.date === date);
   const customers = useMemo(() => new Map(state.customers.map((c) => [c.id, c])), [state.customers]);
@@ -64,16 +66,38 @@ export default function SingleTab({ state, onOpenPayments }: Props) {
         })}
       </p>
 
-      {adding ? (
-        <AddOrderForm state={state} date={date} now={now} onDone={() => setAdding(false)} />
+      {adding === "order" ? (
+        <AddOrderForm state={state} date={date} now={now} onDone={() => setAdding(null)} />
+      ) : adding === "customer" ? (
+        <AddCustomerForm
+          state={state}
+          onDone={(name) => {
+            setAdding(null);
+            setSaved(name ?? null);
+          }}
+        />
       ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="w-full rounded-xl border-2 border-dashed border-zinc-300 py-2.5 text-sm font-medium text-zinc-700 hover:bg-white"
-        >
-          + Add order for {formatDay(date)}
-        </button>
+        <div className="grid grid-cols-[1fr_auto] gap-2">
+          <button
+            type="button"
+            onClick={() => { setAdding("order"); setSaved(null); }}
+            className="rounded-xl border-2 border-dashed border-zinc-300 py-2.5 text-sm font-medium text-zinc-700 hover:bg-white"
+          >
+            + Add order for {formatDay(date)}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAdding("customer"); setSaved(null); }}
+            className="rounded-xl border-2 border-dashed border-zinc-300 px-3 py-2.5 text-sm font-medium text-zinc-700 hover:bg-white"
+          >
+            + Add customer
+          </button>
+        </div>
+      )}
+      {saved && !adding && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+          Saved {saved}. Their messages will now be recognised, and you can add orders for them any time.
+        </p>
       )}
 
       <div className="space-y-3 lg:grid lg:grid-cols-3 lg:items-start lg:gap-4 lg:space-y-0">
@@ -286,6 +310,46 @@ function AddOrderForm({ state, date, now, onDone }: { state: AppState; date: str
           Add order
         </button>
         <button type="button" onClick={onDone} className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-700">
+          Cancel
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// Save a single-meal customer without an order, so their messages are recognised.
+function AddCustomerForm({ state, onDone }: { state: AppState; onDone: (name?: string) => void }) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function save() {
+    if (!name.trim()) return setError("Enter the customer's name.");
+    if (phone.replace(/\D/g, "").length < 10) return setError("Enter a 10-digit phone number.");
+    const existing = state.customers.find((c) => c.phone === normalizePhone(phone));
+    if (existing) return setError(`This number is already saved as ${existing.name}.`);
+    updateState((s) => addCustomer(s, name, phone).state);
+    onDone(name.trim());
+  }
+
+  const input = "w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-emerald-600";
+  return (
+    <section className="space-y-2 rounded-xl bg-white p-4 shadow-sm ring-2 ring-emerald-700/30">
+      <h2 className="text-sm font-semibold text-zinc-800">New customer</h2>
+      <label className="block text-xs text-zinc-600">
+        Name
+        <input value={name} onChange={(e) => { setName(e.target.value); setError(null); }} placeholder="Customer's name" className={input} />
+      </label>
+      <label className="block text-xs text-zinc-600">
+        Phone number
+        <input value={phone} onChange={(e) => { setPhone(e.target.value); setError(null); }} inputMode="tel" placeholder="98450 12345" className={input} />
+      </label>
+      {error && <p className="text-xs text-red-700">{error}</p>}
+      <div className="flex gap-2 pt-1">
+        <button type="button" onClick={save} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">
+          Save customer
+        </button>
+        <button type="button" onClick={() => onDone()} className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-700">
           Cancel
         </button>
       </div>

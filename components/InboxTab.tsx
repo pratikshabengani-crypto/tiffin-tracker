@@ -3,14 +3,22 @@
 import { useState } from "react";
 import { contactLabel } from "@/lib/contact";
 import { formatDay, formatTime, istDate } from "@/lib/rules/time";
-import type { AppState, Message, Outcome } from "@/lib/state";
-import { resetDemo } from "@/lib/store";
+import { setSettled } from "@/lib/actions";
+import { isSettled, type AppState, type Message, type Outcome, type Resolution } from "@/lib/state";
+import { resetDemo, updateState } from "@/lib/store";
 
 export type ChannelStatus = { connected: boolean; error?: string };
 export type Channels = { whatsapp: ChannelStatus; telegram: ChannelStatus };
 
 export default function InboxTab({ state, channels }: { state: AppState; channels: Channels }) {
-  const messages = [...state.messages].sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
+  const [view, setView] = useState<"open" | "settled">("open");
+  const sorted = [...state.messages].sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
+  const open = sorted.filter((m) => !isSettled(m));
+  const messages = view === "open" ? open : sorted.filter(isSettled);
+  const tabs = [
+    { id: "open" as const, label: `Not settled · ${open.length}` },
+    { id: "settled" as const, label: `Settled · ${sorted.length - open.length}` },
+  ];
 
   return (
     <div className="space-y-3">
@@ -27,7 +35,25 @@ export default function InboxTab({ state, channels }: { state: AppState; channel
         </p>
       )}
 
-      {messages.length === 0 && <p className="px-1 text-sm text-zinc-500">No messages yet.</p>}
+      <div className="flex gap-1.5">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setView(tab.id)}
+            aria-pressed={view === tab.id}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+              view === tab.id ? "bg-emerald-700 text-white" : "bg-white text-zinc-700 ring-1 ring-zinc-200"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {messages.length === 0 && (
+        <p className="px-1 text-sm text-zinc-500">{view === "open" ? "Nothing waiting for you." : "No settled messages yet."}</p>
+      )}
       <ul className="space-y-2 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
         {messages.map((m) => (
           <MessageCard key={m.id} message={m} />
@@ -61,6 +87,12 @@ const OUTCOME_STYLE: Record<Outcome["status"], { label: string; className: strin
   applied: { label: "Done", className: "bg-emerald-100 text-emerald-800" },
   attention: { label: "Needs you", className: "bg-amber-100 text-amber-800" },
   ignored: { label: "No change", className: "bg-zinc-100 text-zinc-600" },
+};
+
+const RESOLUTION_LABEL: Record<Resolution, string> = {
+  approved: "Approved",
+  dismissed: "Handled",
+  settled: "Settled",
 };
 
 function MessageCard({ message }: { message: Message }) {
@@ -99,11 +131,22 @@ function MessageCard({ message }: { message: Message }) {
           {message.aiMs !== undefined && ` · ${(message.aiMs / 1000).toFixed(1)} s`}
         </p>
       )}
+      <select
+        value={isSettled(message) ? "settled" : "open"}
+        onChange={(e) => updateState((s) => setSettled(s, message.id, e.target.value === "settled"))}
+        aria-label="Settled or not"
+        className={`mt-2 rounded-lg border px-2 py-1 text-xs font-medium ${
+          isSettled(message) ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"
+        }`}
+      >
+        <option value="open">Not settled</option>
+        <option value="settled">Settled</option>
+      </select>
       <ul className="mt-1.5 space-y-1">
         {message.outcomes.map((o) => (
           <li key={o.id} className="text-xs">
             <span className={`mr-1.5 rounded-full px-1.5 py-0.5 font-medium ${OUTCOME_STYLE[o.status].className}`}>
-              {o.resolution === "approved" ? "Approved" : o.resolution === "dismissed" ? "Handled" : OUTCOME_STYLE[o.status].label}
+              {o.resolution ? RESOLUTION_LABEL[o.resolution] : OUTCOME_STYLE[o.status].label}
             </span>
             <span className="text-zinc-800">{o.summary}</span>
             {o.reason && !o.resolution && <span className="block pl-1 text-amber-800">{o.reason}</span>}

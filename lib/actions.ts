@@ -1,5 +1,5 @@
 import { normalizePhone } from "./contact";
-import type { AppState } from "./state";
+import type { AppState, Resolution } from "./state";
 import { STANDARD_PRICES, type Customer, type Meal, type Payment, type PaymentMethod, type PlanId } from "./types";
 
 function newId(prefix: string): string {
@@ -11,6 +11,23 @@ function newId(prefix: string): string {
 export function addCustomer(state: AppState, name: string, phone: string): { state: AppState; customer: Customer } {
   const customer: Customer = { id: newId("c"), name: name.trim(), phone: normalizePhone(phone) };
   return { state: { ...state, customers: [...state.customers, customer] }, customer };
+}
+
+// Add a monthly subscriber by hand. Someone already saved with this phone number gets the plan.
+export function addSubscriber(
+  state: AppState,
+  input: { name: string; phone: string; planId: PlanId; startDate: string },
+): { state: AppState; customer: Customer; subscriptionId: string } {
+  const phone = normalizePhone(input.phone);
+  let next = state;
+  let customer = state.customers.find((c) => c.phone === phone);
+  if (!customer) {
+    const added = addCustomer(state, input.name, phone);
+    next = added.state;
+    customer = added.customer;
+  }
+  const subscription = { id: newId("s"), customerId: customer.id, planId: input.planId, startDate: input.startDate };
+  return { state: { ...next, subscriptions: [...next.subscriptions, subscription] }, customer, subscriptionId: subscription.id };
 }
 
 // "Add as customer" for a message from an unknown number, optionally with a monthly plan.
@@ -30,7 +47,7 @@ export function addCustomerFromMessage(
     next = { ...next, subscriptions: [...next.subscriptions, { id: newId("s"), customerId: added.customer.id, planId, startDate }] };
   }
   next = resolveOutcome(next, messageId, outcomeId, "dismissed");
-  return { ...next, messages: next.messages.map((m) => (m.id === messageId ? { ...m, senderName: added.customer.name } : m)) };
+  return { ...next, messages: next.messages.map((m) => (m.id === messageId ? { ...m, senderName: added.customer.name, settled: undefined } : m)) };
 }
 
 export function addOrder(
@@ -104,13 +121,8 @@ export function setPrice(state: AppState, date: string, meal: Meal, price: numbe
   return { ...state, priceOverrides };
 }
 
-// Approve or dismiss one "Needs attention" item.
-export function resolveOutcome(
-  state: AppState,
-  messageId: string,
-  outcomeId: string,
-  resolution: "approved" | "dismissed",
-): AppState {
+// Close one "Needs attention" item. Only "approved" applies the suggested change.
+export function resolveOutcome(state: AppState, messageId: string, outcomeId: string, resolution: Resolution): AppState {
   const message = state.messages.find((m) => m.id === messageId);
   const outcome = message?.outcomes.find((o) => o.id === outcomeId);
   if (!message || !outcome) return state;
@@ -149,7 +161,22 @@ export function resolveOutcome(
     messages: next.messages.map((m) =>
       m.id !== messageId
         ? m
-        : { ...m, outcomes: m.outcomes.map((o) => (o.id === outcomeId ? { ...o, resolution } : o)) },
+        : { ...m, settled: undefined, outcomes: m.outcomes.map((o) => (o.id === outcomeId ? { ...o, resolution } : o)) },
     ),
+  };
+}
+
+// Mark a whole message settled (closes anything still open, without changing orders) or not settled.
+export function setSettled(state: AppState, messageId: string, settled: boolean): AppState {
+  return {
+    ...state,
+    messages: state.messages.map((m) => {
+      if (m.id !== messageId) return m;
+      if (!settled) return { ...m, settled: false };
+      const outcomes = m.outcomes.map((o) =>
+        o.status === "attention" && !o.resolution ? { ...o, resolution: "settled" as const } : o,
+      );
+      return { ...m, settled: undefined, outcomes };
+    }),
   };
 }

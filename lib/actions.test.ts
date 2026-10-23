@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addCustomer, addCustomerFromMessage, addOrder, cancelOrder, decidePayment, recordPayment, setNotDelivered, setPrice } from "./actions";
+import { addCustomer, addCustomerFromMessage, addOrder, addSubscriber, cancelOrder, decidePayment, recordPayment, setNotDelivered, setPrice } from "./actions";
 import { findCustomer } from "./applyMessage";
 import { needsAttention } from "./state";
 import { TEST_DAY, demoState } from "./demo/seed";
@@ -67,7 +67,7 @@ describe("owner actions", () => {
   it("adds an unknown sender as a customer with a plan", () => {
     const state = demoState(TEST_DAY);
     const unknown = needsAttention(state).find((a) => !a.message.senderName)!;
-    const next = addCustomerFromMessage(state, unknown.message.id, unknown.outcome.id, "Farhan K", "lunch", TEST_DAY);
+    const next = addCustomerFromMessage(state, unknown.message.id, unknown.outcome!.id, "Farhan K", "lunch", TEST_DAY);
     const customer = findCustomer(next, unknown.message.phone)!;
     expect(customer.name).toBe("Farhan K");
     expect(next.subscriptions.at(-1)).toMatchObject({ customerId: customer.id, planId: "lunch", startDate: TEST_DAY });
@@ -81,5 +81,23 @@ describe("owner actions", () => {
     const withOrder = addOrder(priced, { customerId: customer.id, date: TEST_DAY, meal: "dinner", quantity: 1 }, now);
     expect(khataFor(customer.id, withOrder).owed).toBe(150);
     expect(setPrice(priced, TEST_DAY, "dinner", 130).priceOverrides).toEqual(state.priceOverrides);
+  });
+});
+
+describe("addSubscriber", () => {
+  it("adds a new customer with a plan", () => {
+    const state = demoState(TEST_DAY);
+    const { state: next, customer, subscriptionId } = addSubscriber(state, { name: "Meera P", phone: "+91 99000 11223", planId: "lunch_dinner", startDate: TEST_DAY });
+    expect(customer.phone).toBe("9900011223");
+    expect(next.customers).toHaveLength(state.customers.length + 1);
+    expect(next.subscriptions.find((s) => s.id === subscriptionId)).toMatchObject({ customerId: customer.id, planId: "lunch_dinner", startDate: TEST_DAY });
+  });
+
+  it("gives the plan to an existing customer with the same number", () => {
+    const state = demoState(TEST_DAY);
+    const existing = state.customers[0];
+    const { state: next, customer } = addSubscriber(state, { name: "Someone else", phone: existing.phone, planId: "dinner", startDate: TEST_DAY });
+    expect(customer.id).toBe(existing.id);
+    expect(next.customers).toHaveLength(state.customers.length);
   });
 });

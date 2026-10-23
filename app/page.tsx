@@ -42,7 +42,7 @@ function AppHeader() {
       <div className="mx-auto flex max-w-md items-center gap-2.5 px-4 py-3 lg:max-w-7xl lg:px-6">
         <TiffinLogo />
         <div className="leading-tight">
-          <div className="text-base font-bold tracking-tight">Tiffin Tracker</div>
+          <div className="text-base font-bold tracking-tight">Khana Khata</div>
           <div className="text-[11px] text-emerald-100">{BUSINESS_NAME}</div>
         </div>
       </div>

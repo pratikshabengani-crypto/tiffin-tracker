@@ -2,11 +2,14 @@
 
 import { useMemo, useState } from "react";
 import SubscriberCalendar from "@/components/SubscriberCalendar";
+import { addSubscriber } from "@/lib/actions";
+import { normalizePhone } from "@/lib/contact";
 import { formatINR } from "@/lib/format";
 import { summarizeAll } from "@/lib/rules/counts";
 import { nextAway, type SubscriptionSummary } from "@/lib/rules/subscriptions";
 import { daysBetween, formatDay, istDate } from "@/lib/rules/time";
 import { nowOf, type AppState } from "@/lib/state";
+import { updateState } from "@/lib/store";
 import { PLANS, type PlanId } from "@/lib/types";
 
 type Filter = "all" | "unpaid" | "ending";
@@ -20,6 +23,7 @@ export default function MonthlyTab({ state }: { state: AppState }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [planFilter, setPlanFilter] = useState<PlanId | "all">("all");
   const [selected, setSelected] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const summaries = useMemo(() => summarizeAll(state), [state]);
   const customers = useMemo(() => new Map(state.customers.map((c) => [c.id, c])), [state.customers]);
@@ -79,6 +83,25 @@ export default function MonthlyTab({ state }: { state: AppState }) {
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Monthly subscribers</h1>
         <p className="text-sm text-zinc-500">{rows.length} active plans</p>
       </div>
+
+      {adding ? (
+        <AddSubscriberForm
+          state={state}
+          today={today}
+          onDone={(subscriptionId) => {
+            setAdding(false);
+            if (subscriptionId) setSelected(subscriptionId);
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="w-full rounded-xl border-2 border-dashed border-zinc-300 py-2.5 text-sm font-medium text-zinc-700 hover:bg-white"
+        >
+          + Add subscriber
+        </button>
+      )}
 
       <input
         type="search"
@@ -156,6 +179,72 @@ export default function MonthlyTab({ state }: { state: AppState }) {
       })}
     </div>
     </div>
+  );
+}
+
+// Add a monthly subscriber by hand. Their advance shows as unpaid until it's marked in Payments.
+function AddSubscriberForm({ state, today, onDone }: { state: AppState; today: string; onDone: (subscriptionId?: string) => void }) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [planId, setPlanId] = useState<PlanId>("lunch");
+  const [startDate, setStartDate] = useState(today);
+  const [error, setError] = useState<string | null>(null);
+
+  const existing = state.customers.find((c) => phone.replace(/\D/g, "").length >= 10 && c.phone === normalizePhone(phone));
+
+  function save() {
+    if (!name.trim() && !existing) return setError("Enter the subscriber's name.");
+    if (phone.replace(/\D/g, "").length < 10) return setError("Enter a 10-digit phone number.");
+    if (!startDate) return setError("Pick a start date.");
+    let subscriptionId = "";
+    updateState((s) => {
+      const added = addSubscriber(s, { name: name || existing!.name, phone, planId, startDate });
+      subscriptionId = added.subscriptionId;
+      return added.state;
+    });
+    onDone(subscriptionId);
+  }
+
+  const input = "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-600";
+  return (
+    <section className="space-y-2 rounded-xl bg-white p-4 shadow-sm ring-2 ring-emerald-700/30">
+      <h2 className="text-sm font-semibold text-zinc-800">New subscriber</h2>
+      <label className="block text-xs text-zinc-600">
+        Name
+        <input value={name} onChange={(e) => { setName(e.target.value); setError(null); }} placeholder="Customer's name" className={input} />
+      </label>
+      <label className="block text-xs text-zinc-600">
+        Phone number
+        <input value={phone} onChange={(e) => { setPhone(e.target.value); setError(null); }} inputMode="tel" placeholder="98450 12345" className={input} />
+      </label>
+      {existing && <p className="text-xs text-emerald-800">Already a customer: {existing.name}. The plan will be added to them.</p>}
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block text-xs text-zinc-600">
+          Plan
+          <select value={planId} onChange={(e) => setPlanId(e.target.value as PlanId)} className={input}>
+            {PLAN_ORDER.map((id) => (
+              <option key={id} value={id}>
+                {PLANS[id].label} · {formatINR(PLANS[id].price)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-xs text-zinc-600">
+          Starts on
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={input} />
+        </label>
+      </div>
+      <p className="text-[11px] text-zinc-500">The advance shows as unpaid until you mark it paid in Payments.</p>
+      {error && <p className="text-xs text-red-700">{error}</p>}
+      <div className="flex gap-2 pt-1">
+        <button type="button" onClick={save} className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">
+          Add subscriber
+        </button>
+        <button type="button" onClick={() => onDone()} className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-700">
+          Cancel
+        </button>
+      </div>
+    </section>
   );
 }
 

@@ -125,7 +125,7 @@ type AttemptResult = { status: number; data: any; backup?: boolean };
 async function attempt(apiKey: string, body: string, signal: AbortSignal): Promise<AttemptResult> {
   const res = await fetch(OPENROUTER_URL, {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "X-Title": "Tiffin Tracker" },
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "X-Title": "Khana Khata" },
     body,
     signal,
   });

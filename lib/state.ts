@@ -15,8 +15,11 @@ export type Outcome = {
   summary: string; // "Skip lunch on Fri, 24 Oct"
   reason?: string; // why it needs the owner
   action?: PendingAction;
-  resolution?: "approved" | "dismissed";
+  resolution?: Resolution;
 };
+
+// approved = do the suggested change; dismissed = don't; settled = the owner sorted it out herself.
+export type Resolution = "approved" | "dismissed" | "settled";
 
 export type Message = {
   id: string;
@@ -30,6 +33,7 @@ export type Message = {
   source?: "whatsapp" | "telegram"; // came in through a real messaging connection
   profileName?: string; // sender's WhatsApp display name
   outcomes: Outcome[];
+  settled?: boolean; // set when the owner marks the whole message settled / not settled
 };
 
 export type AppState = Facts & {
@@ -46,10 +50,16 @@ export function nowOf(): string {
   return new Date().toISOString();
 }
 
-export function needsAttention(state: AppState): { message: Message; outcome: Outcome }[] {
-  return state.messages.flatMap((message) =>
-    message.outcomes
-      .filter((outcome) => outcome.status === "attention" && !outcome.resolution)
-      .map((outcome) => ({ message, outcome })),
-  );
+// A message is settled once nothing in it is waiting for the owner, unless she says otherwise.
+export function isSettled(message: Message): boolean {
+  return message.settled ?? !message.outcomes.some((o) => o.status === "attention" && !o.resolution);
+}
+
+// Everything waiting for the owner: each open request, plus messages she marked "not settled".
+export function needsAttention(state: AppState): { message: Message; outcome?: Outcome }[] {
+  return state.messages.flatMap((message) => {
+    const open = message.outcomes.filter((outcome) => outcome.status === "attention" && !outcome.resolution);
+    if (open.length > 0) return open.map((outcome) => ({ message, outcome }));
+    return message.settled === false ? [{ message }] : [];
+  });
 }
